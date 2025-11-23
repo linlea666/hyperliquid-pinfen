@@ -1,0 +1,50 @@
+:root {
+  font-family: 'Inter', 'SF Pro Display', system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+  line-height: 1.6;
+  font-weight: 400;
+  color: #f4f7ff;
+  background-color: #0b1120;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #1f2a44, #0b1120 70%);
+}
+
+a {
+  color: inherit;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+}
+
+table th,
+table td {
+  text-align: left;
+  padding: 0.75rem 0.5rem;
+}
+
+table th {
+  color: #98a2c3;
+  font-size: 0.85rem;
+  letter-spacing: 0.04em;
+}
+
+table tbody tr:nth-child(even) {
+  background: rgba(255, 255, 255, 0.015);
+}
+
+table tbody tr:hover {
+  background: rgba(255, 255, 255, 0.03);
+}

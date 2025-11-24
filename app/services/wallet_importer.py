@@ -1,26 +1,40 @@
+from __future__ import annotations
+
 import json
 from datetime import datetime
 from typing import List
 
 from sqlalchemy import select
 
-from app.core.database import session_scope
+from app.core.database import session_scope, engine
 from app.models import Wallet, WalletImportRecord
 from app.schemas.wallets import WalletImportRequest, WalletImportResponse, WalletImportResult
+
+_IMPORT_TABLE_READY = False
+
+
+def _ensure_import_table_exists() -> None:
+    global _IMPORT_TABLE_READY
+    if _IMPORT_TABLE_READY:
+        return
+    WalletImportRecord.__table__.create(bind=engine, checkfirst=True)
+    _IMPORT_TABLE_READY = True
 
 
 def import_wallets(payload: WalletImportRequest, created_by: str | None = None) -> WalletImportResponse:
     """Persist wallet records and mark for downstream sync."""
+    _ensure_import_table_exists()
     seen = set()
     results: List[WalletImportResult] = []
     imported = 0
 
+    created_ts = datetime.utcnow()
     with session_scope() as session:
         record = WalletImportRecord(
             source=payload.source,
             tag_list=",".join(payload.tags or []),
             created_by=created_by,
-            created_at=datetime.utcnow(),
+            created_at=created_ts,
         )
         session.add(record)
         for addr in payload.addresses:
@@ -33,7 +47,7 @@ def import_wallets(payload: WalletImportRequest, created_by: str | None = None) 
 
             if payload.dry_run:
                 results.append(
-                    WalletImportResult(address=addr, status="dry-run", tags_applied=payload.tags)
+                    WalletImportResult(address=addr, status="dry-run", tags_applied=list(payload.tags or []))
                 )
                 imported += 1
                 continue
@@ -52,7 +66,9 @@ def import_wallets(payload: WalletImportRequest, created_by: str | None = None) 
                 source=payload.source,
             )
             session.add(wallet)
-            results.append(WalletImportResult(address=addr, status="imported", tags_applied=payload.tags))
+            results.append(
+                WalletImportResult(address=addr, status="imported", tags_applied=list(payload.tags or []))
+            )
             imported += 1
 
     skipped = sum(1 for r in results if r.status in {"skipped", "exists"})
@@ -66,5 +82,5 @@ def import_wallets(payload: WalletImportRequest, created_by: str | None = None) 
         source=payload.source,
         tags=payload.tags,
         created_by=created_by,
-        created_at=record.created_at.isoformat(),
+        created_at=created_ts.isoformat(),
     )

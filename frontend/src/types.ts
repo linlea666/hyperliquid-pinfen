@@ -8,16 +8,27 @@ export interface WalletMetric {
   volume?: string;
   max_drawdown?: string;
   avg_pnl?: string;
+  as_of?: number;
+  updated_at?: string;
+}
+
+export interface TagSummary {
+  id?: number;
+  name: string;
+  type?: string;
+  color?: string;
+  icon?: string;
 }
 
 export interface WalletSummary {
   address: string;
   status: string;
-  tags: string[];
+  tags: TagSummary[];
   source: string;
   last_synced_at?: string;
   created_at: string;
   metric?: WalletMetric;
+  metric_period?: string;
   score?: {
     score: string;
     level: string;
@@ -156,4 +167,21 @@ export interface WalletImportResponse {
   skipped: number;
   dry_run: boolean;
   results: WalletImportResult[];
+  source: string;
+  tags: string[];
+  created_by?: string;
+  created_at?: string;
+}
+
+export interface WalletImportHistoryEntry {
+  id: number;
+  source: string;
+  tags: string[];
+  created_by?: string;
+  created_at: string;
+}
+
+export interface WalletImportHistoryResponse {
+  total: number;
+  items: WalletImportHistoryEntry[];
 }

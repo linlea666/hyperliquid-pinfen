@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
@@ -9,6 +9,7 @@ import type { AIAnalysisResponse } from '../types';
 
 export default function WalletDetail() {
   const { address } = useParams();
+  const [copied, setCopied] = useState(false);
 
   const { data: detail, isLoading, error } = useQuery<WalletSummary>({
     queryKey: ['wallet', address],
@@ -64,7 +65,19 @@ export default function WalletDetail() {
   return (
     <div className="page">
       <section className="card">
-        <h2>{detail.address}</h2>
+        <div className="address-cell">
+          <h2>{detail.address}</h2>
+          <button
+            className="btn ghost small"
+            onClick={async () => {
+              await navigator.clipboard.writeText(detail.address);
+              setCopied(true);
+              setTimeout(() => setCopied(false), 2000);
+            }}
+          >
+            {copied ? '已复制' : '复制地址'}
+          </button>
+        </div>
         <p className="muted">
           状态：<span className={`status ${detail.status}`}>{detail.status}</span> ｜{' '}
           {detail.last_synced_at ? `最近同步：${new Date(detail.last_synced_at).toLocaleString()}` : '未同步'}

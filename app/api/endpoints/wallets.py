@@ -15,6 +15,7 @@ from app.schemas.wallets import (
     WalletListResponse,
     WalletSummary,
     WalletDetailResponse,
+    WalletImportHistoryResponse,
 )
 from app.services.wallet_importer import import_wallets
 from app.services import etl
@@ -33,6 +34,19 @@ router = APIRouter()
 )
 def wallets_import(payload: WalletImportRequest = Body(...), user=Depends(get_current_user)) -> WalletImportResponse:
     return import_wallets(payload, created_by=user.email)
+
+
+@router.get(
+    "/wallets/import/history",
+    response_model=WalletImportHistoryResponse,
+    summary="查看最近导入记录",
+)
+def wallets_import_history(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+    user=Depends(get_current_user),
+) -> WalletImportHistoryResponse:
+    return wallets_service.list_import_records(limit=limit, offset=offset)
 
 
 @router.post("/wallets/sync", response_model=WalletSyncResponse, summary="Sync wallet data from Hyperliquid")
@@ -82,10 +96,25 @@ def wallets_list(
     status: str | None = Query(None),
     tag: str | None = Query(None),
     search: str | None = Query(None),
+    period: str | None = Query(None, description="1d|7d|30d|90d|180d|365d|all"),
+    sort_key: str | None = Query(
+        None,
+        description="win_rate|total_pnl|avg_pnl|volume|trades|max_drawdown",
+    ),
+    sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
 ):
-    return wallets_service.list_wallets(limit=limit, offset=offset, status=status, tag=tag, search=search)
+    return wallets_service.list_wallets(
+        limit=limit,
+        offset=offset,
+        status=status,
+        tag=tag,
+        search=search,
+        period=period,
+        sort_key=sort_key,
+        sort_order=sort_order,
+    )
 
 
 @router.get("/wallets/overview", summary="钱包概览统计")

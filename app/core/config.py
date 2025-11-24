@@ -31,8 +31,6 @@ class Settings(BaseSettings):
 
     # Queue
     redis_url: str = "redis://localhost:6379/0"
-    admin_api_token: str = "change-admin-token"
-
     # Notifications
     smtp_host: str = "localhost"
     smtp_port: int = 25

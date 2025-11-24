@@ -1,7 +1,9 @@
+from __future__ import annotations
+
 import re
 from typing import List, Optional
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, EmailStr, Field, field_validator
 
 
 ADDRESS_REGEX = re.compile(r"^0x[a-fA-F0-9]{40}$")
@@ -43,6 +45,19 @@ class WalletImportResponse(BaseModel):
     tags: List[str]
     created_by: Optional[str] = None
     created_at: Optional[str] = None
+
+
+class WalletImportHistoryEntry(BaseModel):
+    id: int
+    source: str
+    tags: List[str] = Field(default_factory=list)
+    created_by: Optional[EmailStr] = None
+    created_at: str
+
+
+class WalletImportHistoryResponse(BaseModel):
+    total: int
+    items: List[WalletImportHistoryEntry]
 
 
 class WalletSyncRequest(BaseModel):
@@ -92,14 +107,23 @@ class JobEnqueueResponse(BaseModel):
     job_id: str
 
 
+class TagSummary(BaseModel):
+    id: Optional[int] = None
+    name: str
+    type: Optional[str] = None
+    color: Optional[str] = None
+    icon: Optional[str] = None
+
+
 class WalletSummary(BaseModel):
     address: str
     status: str
-    tags: List[str]
+    tags: List[TagSummary] = Field(default_factory=list)
     source: str
     last_synced_at: Optional[str] = None
     created_at: str
     metric: Optional[dict] = None
+    metric_period: Optional[str] = None
 
 
 class WalletListResponse(BaseModel):

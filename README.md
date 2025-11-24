@@ -71,8 +71,11 @@ curl http://127.0.0.1:8000/api/tags
 curl http://127.0.0.1:8000/api/leaderboards
 curl -X POST http://127.0.0.1:8000/api/wallets/0x.../ai
 curl http://127.0.0.1:8000/api/reports/operations
-# 刷新全部榜单（需管理员 Token）
-curl -X POST -H "X-Admin-Token: change-admin-token" http://127.0.0.1:8000/api/leaderboards/run_all
+# 刷新全部榜单（需登录获取 Bearer Token）
+# TOKEN=$(curl -s -X POST -H "Content-Type: application/json" \
+#   -d '{"email":"admin@example.com","password":"admin888"}' \
+#   http://127.0.0.1:8000/api/auth/login | jq -r '.access_token')
+curl -X POST -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/leaderboards/run_all
 ```
 
 ## 目录结构（当前）
@@ -94,7 +97,7 @@ curl -X POST -H "X-Admin-Token: change-admin-token" http://127.0.0.1:8000/api/le
 - `app/services/leaderboard.py`：榜单定义与计算。
 - `app/services/ai.py`：AI 分析/建议。
 - `app/services/tasks_service.py` / `app/services/notifications.py`：任务日志、通知模板与订阅。
-- `app/api/endpoints/admin.py`：后台管理接口（使用 `X-Admin-Token` 保护）。
+- `app/api/endpoints/admin.py`：后台管理接口（使用 JWT 鉴权，登录后访问）。
 - `app/api/endpoints/tags.py`：标签 CRUD 及钱包打标接口。
 - `app/api/endpoints/leaderboards.py`：榜单列表/详情/刷新接口。
 - `app/api/endpoints/ai.py`：AI 分析触发与查询。
@@ -112,28 +115,31 @@ rq worker wallet-sync
 - 通过 `/api/wallets/sync_async` 入队同步任务，返回 job_id。
 
 ### 管理后台接口（RBAC / 配置 / 审计）
-- 设置 `ADMIN_API_TOKEN`（默认 `change-admin-token`），调用接口需在 Header 中携带 `X-Admin-Token`。
+- 通过 `/api/auth/login` 登录获取 `access_token`，所有管理员接口需要在 Header 中附带 `Authorization: Bearer <token>`。
 - 示例：
 ```bash
-curl -H "X-Admin-Token: change-admin-token" http://127.0.0.1:8000/api/admin/users
+TOKEN=$(curl -s -X POST -H "Content-Type: application/json" \
+  -d '{"email":"admin@example.com","password":"admin888"}' \
+  http://127.0.0.1:8000/api/auth/login | jq -r '.access_token')
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/admin/users
 ```
-- 支持用户、角色、权限 CRUD，系统配置、审计日志查询。
+- 登录后可操作用户、角色、权限 CRUD，系统配置、审计日志查询等。
 
 ### 标签 / 榜单 / AI
 - 标签管理：
 ```bash
 curl http://127.0.0.1:8000/api/tags
-curl -X POST -H "Content-Type: application/json" -H "X-Admin-Token: change-admin-token" \
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -d '{"name":"稳健型","type":"system","color":"#22d3ee"}' http://127.0.0.1:8000/api/tags
-curl -X POST -H "Content-Type: application/json" -H "X-Admin-Token: change-admin-token" \
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -d '{"tag_ids":[1,2]}' http://127.0.0.1:8000/api/wallets/0x.../tags
 ```
 - 榜单：
 ```bash
 curl http://127.0.0.1:8000/api/leaderboards
-curl -X POST -H "Content-Type: application/json" -H "X-Admin-Token: change-admin-token" \
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -d '{"name":"高收益榜","sort_key":"total_pnl","sort_order":"desc"}' http://127.0.0.1:8000/api/leaderboards
-curl -X POST -H "X-Admin-Token: change-admin-token" http://127.0.0.1:8000/api/leaderboards/1/run
+curl -X POST -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/leaderboards/1/run
 ```
 - AI 分析：
 ```bash
@@ -148,15 +154,15 @@ curl http://127.0.0.1:8000/api/reports/operations
 ```
 - 任务列表 / 通知模板（需管理员 Token）：
 ```bash
-curl -H "X-Admin-Token: change-admin-token" http://127.0.0.1:8000/api/tasks
-curl -X POST -H "Content-Type: application/json" -H "X-Admin-Token: change-admin-token" \
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/tasks
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -d '{"name":"任务完成提醒","channel":"email","content":"{{wallet}} 已完成同步"}' http://127.0.0.1:8000/api/notifications/templates
-curl -X POST -H "Content-Type: application/json" -H "X-Admin-Token: change-admin-token" \
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -d '{"recipient":"ops@example.com","template_id":1}' http://127.0.0.1:8000/api/notifications/subscriptions
 - 调度配置（需管理员 Token）：
 ```bash
-curl -H "X-Admin-Token: change-admin-token" http://127.0.0.1:8000/api/schedules
-curl -X POST -H "Content-Type: application/json" -H "X-Admin-Token: change-admin-token" \
+curl -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/schedules
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -d '{"name":"每小时刷新榜单","job_type":"leaderboard_run_all","cron":"0 * * * *"}' http://127.0.0.1:8000/api/schedules
 ```
 
@@ -168,8 +174,8 @@ curl -X POST -H "Content-Type: application/json" -H "X-Admin-Token: change-admin
 ### 用户偏好 / 前端设置
 - 后台接口（需管理员 Token）：
 ```bash
-curl -H "X-Admin-Token: change-admin-token" "http://127.0.0.1:8000/api/admin/preferences?email=user@example.com"
-curl -X POST -H "Content-Type: application/json" -H "X-Admin-Token: change-admin-token" \
+curl -H "Authorization: Bearer $TOKEN" "http://127.0.0.1:8000/api/admin/preferences?email=user@example.com"
+curl -X POST -H "Content-Type: application/json" -H "Authorization: Bearer $TOKEN" \
   -d '{"default_period":"30d","favorite_wallets":["0x..."]}' \
   "http://127.0.0.1:8000/api/admin/preferences?email=user@example.com"
 ```

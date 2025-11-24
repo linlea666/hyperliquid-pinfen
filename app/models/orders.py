@@ -6,9 +6,6 @@ from app.core.database import Base
 
 class OrderHistory(Base):
     __tablename__ = "orders_history"
-    __table_args__ = (
-        UniqueConstraint("user", "time_ms", "oid", name="uq_orders_user_time_oid"),
-    )
 
     id = Column(Integer, primary_key=True, index=True)
     user = Column(String(64), index=True, nullable=False)
@@ -29,3 +26,7 @@ class OrderHistory(Base):
     cloid = Column(String(64))
     raw_json = Column(Text, nullable=False)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+    __table_args__ = (
+        UniqueConstraint("user", "time_ms", "oid", name="uq_orders_user_time_oid"),
+    )

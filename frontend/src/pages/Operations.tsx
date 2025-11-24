@@ -9,7 +9,7 @@ export default function Operations() {
     queryFn: () => apiGet<OperationsReport>('/reports/operations'),
   });
 
-  const { data: tasks, refetch: refetchTasks, isError: tasksError } = useQuery<TaskListResponse>({
+  const { data: tasks, isError: tasksError } = useQuery<TaskListResponse>({
     queryKey: ['tasks'],
     queryFn: () => apiGet<TaskListResponse>('/tasks'),
   });

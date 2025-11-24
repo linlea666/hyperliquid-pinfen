@@ -2,7 +2,7 @@ import json
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 
-from app.api.deps import require_admin_token
+from app.api.deps import get_current_user
 from app.schemas.leaderboard import (
     LeaderboardCreate,
     LeaderboardResponse,
@@ -39,7 +39,7 @@ def list_leaderboards():
     return [serialize_lb(lb) for lb in lbs]
 
 
-@router.post("/leaderboards", response_model=LeaderboardResponse, dependencies=[Depends(require_admin_token)])
+@router.post("/leaderboards", response_model=LeaderboardResponse, dependencies=[Depends(get_current_user)])
 def create_leaderboard(payload: LeaderboardCreate):
     lb = lb_service.create_leaderboard(
         name=payload.name,
@@ -58,7 +58,7 @@ def create_leaderboard(payload: LeaderboardCreate):
     return serialize_lb(lb)
 
 
-@router.put("/leaderboards/{lb_id}", response_model=LeaderboardResponse, dependencies=[Depends(require_admin_token)])
+@router.put("/leaderboards/{lb_id}", response_model=LeaderboardResponse, dependencies=[Depends(get_current_user)])
 def update_leaderboard(lb_id: int, payload: LeaderboardCreate):
     lb = lb_service.update_leaderboard(
         lb_id,
@@ -78,7 +78,7 @@ def update_leaderboard(lb_id: int, payload: LeaderboardCreate):
     return serialize_lb(lb)
 
 
-@router.post("/leaderboards/{lb_id}/run", response_model=LeaderboardResultResponse, dependencies=[Depends(require_admin_token)])
+@router.post("/leaderboards/{lb_id}/run", response_model=LeaderboardResultResponse, dependencies=[Depends(get_current_user)])
 def run_leaderboard(lb_id: int):
     try:
         lb_service.run_leaderboard(lb_id)
@@ -87,7 +87,7 @@ def run_leaderboard(lb_id: int):
     return get_leaderboard(lb_id)
 
 
-@router.post("/leaderboards/run_all", dependencies=[Depends(require_admin_token)])
+@router.post("/leaderboards/run_all", dependencies=[Depends(get_current_user)])
 def run_all_leaderboards():
     updated = lb_service.run_all_leaderboards()
     return {"updated": updated}

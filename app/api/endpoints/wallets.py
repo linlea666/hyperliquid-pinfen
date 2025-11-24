@@ -1,6 +1,7 @@
-from fastapi import APIRouter, Body, Query, HTTPException
+from fastapi import APIRouter, Body, Query, HTTPException, Depends
 from fastapi.responses import StreamingResponse
 
+from app.api.deps import get_current_user
 from app.schemas.wallets import (
     WalletImportRequest,
     WalletImportResponse,
@@ -25,9 +26,13 @@ from app.services import wallets_service
 router = APIRouter()
 
 
-@router.post("/wallets/import", response_model=WalletImportResponse, summary="Import wallets")
-def wallets_import(payload: WalletImportRequest = Body(...)) -> WalletImportResponse:
-    return import_wallets(payload)
+@router.post(
+    "/wallets/import",
+    response_model=WalletImportResponse,
+    summary="Import wallets",
+)
+def wallets_import(payload: WalletImportRequest = Body(...), user=Depends(get_current_user)) -> WalletImportResponse:
+    return import_wallets(payload, created_by=user.email)
 
 
 @router.post("/wallets/sync", response_model=WalletSyncResponse, summary="Sync wallet data from Hyperliquid")

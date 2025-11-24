@@ -142,3 +142,18 @@ export interface SubscriptionResponse {
   template_id: number;
   enabled: boolean;
 }
+
+export interface WalletImportResult {
+  address: string;
+  status: string;
+  message?: string;
+  tags_applied: string[];
+}
+
+export interface WalletImportResponse {
+  requested: number;
+  imported: number;
+  skipped: number;
+  dry_run: boolean;
+  results: WalletImportResult[];
+}

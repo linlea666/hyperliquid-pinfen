@@ -19,6 +19,15 @@ export default function Header() {
         <Link to="/dashboard" className="btn primary">
           仪表盘
         </Link>
+        <button
+          className="btn secondary"
+          onClick={() => {
+            localStorage.removeItem('authToken');
+            window.location.href = '/login';
+          }}
+        >
+          退出
+        </button>
       </div>
     </header>
   );

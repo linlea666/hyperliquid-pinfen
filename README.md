@@ -20,6 +20,10 @@ npm run dev
 ```
 默认 `.env.development` 使用 `VITE_API_BASE_URL=http://localhost:8000/api`，上线后请根据绑定的域名修改该变量（避免在代码中写死地址）。
 
+### 管理后台登录
+- 默认账号：`admin@example.com`，密码：`admin888`（首次启动自动创建，务必尽快在后台用户管理里修改）。
+- 登录地址：`/login`，登录后可访问钱包管理、评分配置、AI 配置、通知/调度等所有后台菜单；如需退出，可在右上角点击“退出”。
+
 ### 示例：导入钱包（当前为队列占位逻辑）
 ```bash
 curl -X POST http://127.0.0.1:8000/api/wallets/import \

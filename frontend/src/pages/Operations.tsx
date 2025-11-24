@@ -1,30 +1,22 @@
-import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost } from '../api/client';
 import type { OperationsReport, TaskListResponse, Schedule } from '../types';
 
 export default function Operations() {
-  const queryClient = useQueryClient();
-  const [tokenInput, setTokenInput] = useState<string>(() => (typeof window !== 'undefined' ? localStorage.getItem('adminToken') ?? '' : ''));
-  const [hasToken, setHasToken] = useState<boolean>(() => Boolean(typeof window !== 'undefined' && localStorage.getItem('adminToken')));
-
   const { data: report } = useQuery<OperationsReport>({
     queryKey: ['operations-report'],
     queryFn: () => apiGet<OperationsReport>('/reports/operations'),
   });
 
   const { data: tasks, refetch: refetchTasks, isError: tasksError } = useQuery<TaskListResponse>({
-    queryKey: ['tasks', hasToken],
+    queryKey: ['tasks'],
     queryFn: () => apiGet<TaskListResponse>('/tasks'),
-    enabled: hasToken,
-    retry: 0,
   });
 
   const { data: schedules, refetch: refetchSchedules } = useQuery<Schedule[]>({
-    queryKey: ['schedules', hasToken],
+    queryKey: ['schedules'],
     queryFn: () => apiGet<Schedule[]>('/schedules'),
-    enabled: hasToken,
-    retry: 0,
   });
 
   const [newSchedule, setNewSchedule] = useState({
@@ -33,12 +25,6 @@ export default function Operations() {
     cron: '0 * * * *',
     address: '',
   });
-
-  useEffect(() => {
-    if (hasToken) {
-      refetchTasks();
-    }
-  }, [hasToken, refetchTasks]);
 
   return (
     <div className="page">
@@ -67,57 +53,35 @@ export default function Operations() {
 
       <section className="card">
         <h3>任务监控（管理员）</h3>
-        <div className="filters">
-          <input
-            placeholder="输入管理员 Token"
-            value={tokenInput}
-            onChange={(e) => setTokenInput(e.target.value)}
-          />
-          <button
-            className="btn primary"
-            onClick={() => {
-              if (typeof window === 'undefined') return;
-              window.localStorage.setItem('adminToken', tokenInput);
-              setHasToken(Boolean(tokenInput));
-              queryClient.invalidateQueries({ queryKey: ['tasks'] });
-            }}
-          >
-            保存令牌
-          </button>
-        </div>
-        {!hasToken && <p className="muted">未设置管理员 Token，仅显示公共数据。</p>}
-        {tasksError && <p className="error">任务列表加载失败，请检查 Token。</p>}
-        {hasToken && (
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>ID</th>
-                  <th>类型</th>
-                  <th>状态</th>
-                  <th>开始时间</th>
-                  <th>结束时间</th>
+        {tasksError && <p className="error">任务列表加载失败，请稍后重试。</p>}
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>ID</th>
+                <th>类型</th>
+                <th>状态</th>
+                <th>开始时间</th>
+                <th>结束时间</th>
+              </tr>
+            </thead>
+            <tbody>
+              {tasks?.items.map((task) => (
+                <tr key={task.id}>
+                  <td>{task.id}</td>
+                  <td>{task.task_type}</td>
+                  <td>{task.status}</td>
+                  <td>{new Date(task.started_at).toLocaleString()}</td>
+                  <td>{task.finished_at ? new Date(task.finished_at).toLocaleString() : '-'}</td>
                 </tr>
-              </thead>
-              <tbody>
-                {tasks?.items.map((task) => (
-                  <tr key={task.id}>
-                    <td>{task.id}</td>
-                    <td>{task.task_type}</td>
-                    <td>{task.status}</td>
-                    <td>{new Date(task.started_at).toLocaleString()}</td>
-                    <td>{task.finished_at ? new Date(task.finished_at).toLocaleString() : '-'}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
+              ))}
+            </tbody>
+          </table>
+        </div>
       </section>
 
-      {hasToken && (
-        <section className="card">
-          <h3>自动调度</h3>
+      <section className="card">
+        <h3>自动调度</h3>
           <div className="filters">
             <input
               placeholder="任务名称"
@@ -181,8 +145,7 @@ export default function Operations() {
               </tbody>
             </table>
           </div>
-        </section>
-      )}
+      </section>
     </div>
   );
 }

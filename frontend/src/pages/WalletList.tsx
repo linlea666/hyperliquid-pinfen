@@ -48,6 +48,11 @@ export default function WalletList() {
   return (
     <div className="page">
       <section className="card">
+        <div className="header-actions">
+          <button className="btn primary" onClick={() => navigate('/wallets/import')}>
+            批量导入
+          </button>
+        </div>
         <div className="filters">
           <input
             placeholder="搜索地址"

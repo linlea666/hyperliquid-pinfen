@@ -39,6 +39,10 @@ class WalletImportResponse(BaseModel):
     skipped: int
     dry_run: bool
     results: List[WalletImportResult]
+    source: str
+    tags: List[str]
+    created_by: Optional[str] = None
+    created_at: Optional[str] = None
 
 
 class WalletSyncRequest(BaseModel):

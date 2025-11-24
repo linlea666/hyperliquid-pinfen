@@ -3,7 +3,7 @@ from typing import List
 
 from fastapi import APIRouter, Depends, Query
 
-from app.api.deps import require_admin_token
+from app.api.deps import get_current_user
 from app.schemas.notifications import (
     NotificationHistoryResponse,
     NotificationSendRequest,
@@ -25,7 +25,7 @@ from app.services import scheduler as scheduler_service
 router = APIRouter()
 
 
-@router.get("/tasks", response_model=TaskListResponse, dependencies=[Depends(require_admin_token)])
+@router.get("/tasks", response_model=TaskListResponse, dependencies=[Depends(get_current_user)])
 def list_tasks(status: str | None = None, task_type: str | None = None, limit: int = Query(50, ge=1, le=200)):
     items = tasks_service.list_tasks(limit=limit, status=status, task_type=task_type)
     return TaskListResponse(
@@ -45,7 +45,7 @@ def list_tasks(status: str | None = None, task_type: str | None = None, limit: i
     )
 
 
-@router.get("/notifications/templates", response_model=List[TemplateResponse], dependencies=[Depends(require_admin_token)])
+@router.get("/notifications/templates", response_model=List[TemplateResponse], dependencies=[Depends(get_current_user)])
 def list_templates():
     return [
         TemplateResponse(
@@ -60,7 +60,7 @@ def list_templates():
     ]
 
 
-@router.post("/notifications/templates", response_model=TemplateResponse, dependencies=[Depends(require_admin_token)])
+@router.post("/notifications/templates", response_model=TemplateResponse, dependencies=[Depends(get_current_user)])
 def create_template(payload: TemplateCreate):
     tpl = notification_service.create_template(payload.name, payload.channel, payload.subject, payload.content, payload.description)
     return TemplateResponse(
@@ -73,13 +73,13 @@ def create_template(payload: TemplateCreate):
     )
 
 
-@router.post("/notifications/subscriptions", response_model=SubscriptionResponse, dependencies=[Depends(require_admin_token)])
+@router.post("/notifications/subscriptions", response_model=SubscriptionResponse, dependencies=[Depends(get_current_user)])
 def create_subscription(payload: SubscriptionCreate):
     sub = notification_service.subscribe(payload.recipient, payload.template_id, payload.enabled)
     return SubscriptionResponse(id=sub.id, recipient=sub.recipient, template_id=sub.template_id, enabled=bool(sub.enabled))
 
 
-@router.get("/notifications/subscriptions", response_model=List[SubscriptionResponse], dependencies=[Depends(require_admin_token)])
+@router.get("/notifications/subscriptions", response_model=List[SubscriptionResponse], dependencies=[Depends(get_current_user)])
 def list_subscriptions(template_id: int | None = None):
     subs = notification_service.list_subscriptions(template_id)
     return [
@@ -88,7 +88,7 @@ def list_subscriptions(template_id: int | None = None):
     ]
 
 
-@router.post("/notifications/send", response_model=NotificationHistoryResponse, dependencies=[Depends(require_admin_token)])
+@router.post("/notifications/send", response_model=NotificationHistoryResponse, dependencies=[Depends(get_current_user)])
 def send_notification(payload: NotificationSendRequest):
     history = notification_service.send_notification(payload.template_id, payload.recipient, payload.payload)
     return NotificationHistoryResponse(
@@ -102,7 +102,7 @@ def send_notification(payload: NotificationSendRequest):
     )
 
 
-@router.get("/notifications/history", response_model=List[NotificationHistoryResponse], dependencies=[Depends(require_admin_token)])
+@router.get("/notifications/history", response_model=List[NotificationHistoryResponse], dependencies=[Depends(get_current_user)])
 def history(limit: int = Query(50, ge=1, le=200)):
     records = list_history(limit)
     return [
@@ -119,7 +119,7 @@ def history(limit: int = Query(50, ge=1, le=200)):
     ]
 
 
-@router.get("/reports/operations", response_model=OperationsReport)
+@router.get("/reports/operations", response_model=OperationsReport, dependencies=[Depends(get_current_user)])
 def operations_report():
     overview = wallets_service.get_wallet_overview()
     task_stats = tasks_service.stats()
@@ -136,7 +136,7 @@ def operations_report():
     )
 
 
-@router.get("/schedules", response_model=List[ScheduleResponse], dependencies=[Depends(require_admin_token)])
+@router.get("/schedules", response_model=List[ScheduleResponse], dependencies=[Depends(get_current_user)])
 def list_schedules():
     return [
         ScheduleResponse(
@@ -151,7 +151,7 @@ def list_schedules():
     ]
 
 
-@router.post("/schedules", response_model=ScheduleResponse, dependencies=[Depends(require_admin_token)])
+@router.post("/schedules", response_model=ScheduleResponse, dependencies=[Depends(get_current_user)])
 def create_schedule(payload: ScheduleCreate):
     job = scheduler_service.create_schedule(payload.name, payload.job_type, payload.cron, payload.payload, payload.enabled)
     return ScheduleResponse(

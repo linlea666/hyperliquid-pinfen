@@ -203,6 +203,56 @@
   color: #fda4af;
 }
 
+.import-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.import-grid textarea {
+  width: 100%;
+  resize: vertical;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
+
+.checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 100vh;
+  background: radial-gradient(circle at top, #1f2a44, #0b1120 70%);
+}
+
+.login-card {
+  width: 320px;
+  padding: 2rem;
+  border-radius: 16px;
+  background: rgba(12, 19, 39, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.login-card input {
+  width: 100%;
+  padding: 0.5rem 0.75rem;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  background: rgba(255, 255, 255, 0.05);
+  color: #fff;
+}
 .tag-chip {
   display: inline-flex;
   align-items: center;

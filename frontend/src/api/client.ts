@@ -11,16 +11,16 @@ function buildQuery(params?: Record<string, any>) {
   return query ? `?${query}` : '';
 }
 
-function adminHeaders(): Record<string, string> {
+function authHeaders(): Record<string, string> {
   if (typeof window === 'undefined') return {};
-  const token = window.localStorage.getItem('adminToken');
-  return token ? { 'X-Admin-Token': token } : {};
+  const token = window.localStorage.getItem('authToken');
+  return token ? { Authorization: `Bearer ${token}` } : {};
 }
 
 export async function apiGet<T>(path: string, params?: Record<string, any>): Promise<T> {
   const res = await fetch(`${API_BASE}${path}${buildQuery(params)}`, {
     headers: {
-      ...adminHeaders(),
+      ...authHeaders(),
     },
   });
   if (!res.ok) {
@@ -32,7 +32,19 @@ export async function apiGet<T>(path: string, params?: Record<string, any>): Pro
 export async function apiPost<T>(path: string, body?: Record<string, any>): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...adminHeaders() },
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    throw new Error(`请求失败：${res.statusText}`);
+  }
+  return res.json();
+}
+
+export async function apiPostPublic<T>(path: string, body?: Record<string, any>): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {

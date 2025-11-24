@@ -1,18 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { apiGet, apiPost } from '../api/client';
 import type { PreferenceResponse } from '../types';
 
 export default function Settings() {
   const [email, setEmail] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('userEmail') ?? '' : ''));
-  const [token, setToken] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('adminToken') ?? '' : ''));
   const [prefs, setPrefs] = useState<PreferenceResponse | null>(null);
   const [message, setMessage] = useState('');
-
-  useEffect(() => {
-    if (token && typeof window !== 'undefined') {
-      localStorage.setItem('adminToken', token);
-    }
-  }, [token]);
 
   const loadPreferences = async () => {
     if (!email) return;
@@ -39,7 +32,6 @@ export default function Settings() {
       <section className="card">
         <h2>用户偏好配置</h2>
         <div className="filters">
-          <input placeholder="管理员 Token" value={token} onChange={(e) => setToken(e.target.value)} />
           <input placeholder="用户邮箱" value={email} onChange={(e) => setEmail(e.target.value)} />
           <button className="btn primary" onClick={loadPreferences}>
             加载偏好

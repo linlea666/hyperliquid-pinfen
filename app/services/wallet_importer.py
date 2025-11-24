@@ -1,20 +1,28 @@
 import json
+from datetime import datetime
 from typing import List
 
 from sqlalchemy import select
 
 from app.core.database import session_scope
-from app.models import Wallet
+from app.models import Wallet, WalletImportRecord
 from app.schemas.wallets import WalletImportRequest, WalletImportResponse, WalletImportResult
 
 
-def import_wallets(payload: WalletImportRequest) -> WalletImportResponse:
+def import_wallets(payload: WalletImportRequest, created_by: str | None = None) -> WalletImportResponse:
     """Persist wallet records and mark for downstream sync."""
     seen = set()
     results: List[WalletImportResult] = []
     imported = 0
 
     with session_scope() as session:
+        record = WalletImportRecord(
+            source=payload.source,
+            tag_list=",".join(payload.tags or []),
+            created_by=created_by,
+            created_at=datetime.utcnow(),
+        )
+        session.add(record)
         for addr in payload.addresses:
             if not payload.allow_duplicates and addr in seen:
                 results.append(
@@ -55,4 +63,8 @@ def import_wallets(payload: WalletImportRequest) -> WalletImportResponse:
         skipped=skipped,
         dry_run=payload.dry_run,
         results=results,
+        source=payload.source,
+        tags=payload.tags,
+        created_by=created_by,
+        created_at=record.created_at.isoformat(),
     )

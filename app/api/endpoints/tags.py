@@ -2,7 +2,7 @@ from typing import List
 
 from fastapi import APIRouter, Body, Depends, HTTPException
 
-from app.api.deps import require_admin_token
+from app.api.deps import get_current_user
 from app.services import tags as tag_service
 from app.schemas.tags import (
     TagCreateRequest,
@@ -34,7 +34,7 @@ def list_tags(tag_type: str | None = None):
     return result
 
 
-@router.post("/tags", response_model=TagResponse, dependencies=[Depends(require_admin_token)])
+@router.post("/tags", response_model=TagResponse, dependencies=[Depends(get_current_user)])
 def create_tag(payload: TagCreateRequest):
     tag = tag_service.create_tag(
         name=payload.name,
@@ -75,7 +75,7 @@ def wallet_tags(address: str):
     )
 
 
-@router.post("/wallets/{address}/tags", response_model=WalletTagsResponse, dependencies=[Depends(require_admin_token)])
+@router.post("/wallets/{address}/tags", response_model=WalletTagsResponse, dependencies=[Depends(get_current_user)])
 def assign_wallet_tags(address: str, payload: AssignTagsRequest = Body(...)):
     tag_service.assign_tags(address, payload.tag_ids)
     return wallet_tags(address)

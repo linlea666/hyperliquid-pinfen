@@ -4,14 +4,14 @@ import json
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 
-from app.api.deps import require_admin_token
+from app.api.deps import get_current_user
 from app.schemas import admin as admin_schema
 from app.schemas.preferences import PreferenceResponse, PreferenceUpdate
 from app.services import admin as admin_service
 from app.services import audit as audit_service
 from app.services import user_preferences as pref_service
 
-router = APIRouter(dependencies=[Depends(require_admin_token)])
+router = APIRouter(dependencies=[Depends(get_current_user)])
 
 
 def serialize_user(user):

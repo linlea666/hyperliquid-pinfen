@@ -1,36 +1,25 @@
-import { useEffect, useState } from 'react';
-import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost } from '../api/client';
 import type { Schedule, TemplateResponse, SubscriptionResponse, PreferenceResponse } from '../types';
 
 export default function AdminPanel() {
-  const queryClient = useQueryClient();
-  const [token, setToken] = useState(() => (typeof window !== 'undefined' ? localStorage.getItem('adminToken') ?? '' : ''));
   const [email, setEmail] = useState('');
   const [message, setMessage] = useState('');
 
-  useEffect(() => {
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('adminToken', token);
-    }
-  }, [token]);
-
   const { data: templates, refetch: refetchTemplates } = useQuery<TemplateResponse[]>({
-    queryKey: ['admin-templates', token],
+    queryKey: ['admin-templates'],
     queryFn: () => apiGet<TemplateResponse[]>('/notifications/templates'),
-    enabled: Boolean(token),
   });
 
   const { data: subs, refetch: refetchSubs } = useQuery<SubscriptionResponse[]>({
-    queryKey: ['admin-subs', token],
+    queryKey: ['admin-subs'],
     queryFn: () => apiGet<SubscriptionResponse[]>('/notifications/subscriptions'),
-    enabled: Boolean(token),
   });
 
   const { data: schedules, refetch: refetchSchedules } = useQuery<Schedule[]>({
-    queryKey: ['admin-schedules', token],
+    queryKey: ['admin-schedules'],
     queryFn: () => apiGet<Schedule[]>('/schedules'),
-    enabled: Boolean(token),
   });
 
   const [newTemplate, setNewTemplate] = useState({ name: '', channel: 'email', subject: '', content: '' });
@@ -55,12 +44,7 @@ export default function AdminPanel() {
     <div className="page">
       <section className="card">
         <h2>管理员设置</h2>
-        <div className="filters">
-          <input placeholder="管理员 Token" value={token} onChange={(e) => setToken(e.target.value)} />
-          <button className="btn primary" onClick={() => queryClient.invalidateQueries()}>
-            使用 Token
-          </button>
-        </div>
+        <p className="muted">已通过账号登录，所有配置均需权限。</p>
       </section>
 
       <section className="card">

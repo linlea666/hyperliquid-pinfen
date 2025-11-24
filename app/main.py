@@ -7,6 +7,7 @@ from app.core.logging import setup_logging
 from app.core.database import Base, engine
 import app.models  # noqa: F401
 from app.services.scheduler import start_scheduler, stop_scheduler
+from app.services.bootstrap import ensure_default_admin
 
 
 def create_app() -> FastAPI:
@@ -33,6 +34,7 @@ def create_app() -> FastAPI:
     @app.on_event("startup")
     def _startup() -> None:
         Base.metadata.create_all(bind=engine)
+        ensure_default_admin()
         start_scheduler()
 
     @app.on_event("shutdown")

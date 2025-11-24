@@ -9,7 +9,14 @@ from app.models.auth import User, Role, Permission, AuditLog, SystemConfig, User
 from app.models.tags import Tag, WalletTag
 from app.models.leaderboard import Leaderboard, LeaderboardResult
 from app.models.ai import AIAnalysis
-from app.models.tasks import TaskRecord, NotificationTemplate, NotificationSubscription, NotificationHistory, ScheduleJob
+from app.models.tasks import (
+    TaskRecord,
+    NotificationTemplate,
+    NotificationSubscription,
+    NotificationHistory,
+    ScheduleJob,
+    WalletProcessingLog,
+)
 from app.models.wallet_import import WalletImportRecord
 
 __all__ = [
@@ -38,5 +45,6 @@ __all__ = [
     "NotificationSubscription",
     "NotificationHistory",
     "ScheduleJob",
+    "WalletProcessingLog",
     "WalletImportRecord",
 ]

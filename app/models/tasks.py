@@ -18,6 +18,23 @@ class TaskRecord(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class WalletProcessingLog(Base):
+    __tablename__ = "wallet_processing_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    wallet_address = Column(String(64), index=True, nullable=False)
+    stage = Column(String(32), nullable=False)  # sync | score | ai
+    status = Column(String(32), default="pending")
+    payload = Column(Text, nullable=True)
+    result = Column(Text, nullable=True)
+    error = Column(Text, nullable=True)
+    attempt = Column(Integer, default=1)
+    scheduled_by = Column(String(32), default="system")
+    started_at = Column(DateTime, nullable=True)
+    finished_at = Column(DateTime, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
 class NotificationTemplate(Base):
     __tablename__ = "notification_templates"
 

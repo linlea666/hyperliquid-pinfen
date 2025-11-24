@@ -23,9 +23,16 @@ export interface TagSummary {
 export interface WalletSummary {
   address: string;
   status: string;
+  sync_status?: string;
+  score_status?: string;
+  ai_status?: string;
   tags: TagSummary[];
   source: string;
   last_synced_at?: string;
+  last_score_at?: string;
+  last_ai_at?: string;
+  next_score_due?: string;
+  last_error?: string;
   created_at: string;
   metric?: WalletMetric;
   metric_period?: string;
@@ -159,6 +166,7 @@ export interface WalletImportResult {
   status: string;
   message?: string;
   tags_applied: string[];
+  job_id?: string;
 }
 
 export interface WalletImportResponse {

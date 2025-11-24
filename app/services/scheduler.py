@@ -59,7 +59,10 @@ def run_schedule_job(job_id: int) -> None:
     elif job.job_type == "wallet_sync":
         address = payload.get("address")
         if address:
-            task_queue.enqueue_wallet_sync(address)
+            try:
+                task_queue.enqueue_wallet_sync(address, scheduled_by="schedule")
+            except ValueError as exc:
+                logger.warning("Failed to enqueue scheduled sync for %s: %s", address, exc)
     else:
         logger.warning("Unknown job type %s", job.job_type)
 

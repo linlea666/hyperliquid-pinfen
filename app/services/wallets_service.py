@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, asc, desc, func, select
+from sqlalchemy import and_, desc, func, select
 
 from app.core.database import session_scope
 from app.models import (
@@ -31,15 +31,6 @@ def _serialize_sa(obj):
         elif hasattr(value, "isoformat"):
             data[key] = value.isoformat()
     return data
-
-
-def update_sync_status(address: str) -> None:
-    with session_scope() as session:
-        wallet = session.execute(select(Wallet).where(Wallet.address == address)).scalar_one_or_none()
-        if wallet:
-            wallet.status = "synced"
-            wallet.last_synced_at = datetime.utcnow()
-            session.add(wallet)
 
 
 PERIOD_PRESETS = {
@@ -210,9 +201,16 @@ def list_wallets(
         return {
             "address": wallet.address,
             "status": wallet.status,
+            "sync_status": wallet.sync_status,
+            "score_status": wallet.score_status,
+            "ai_status": wallet.ai_status,
             "tags": tags,
             "source": wallet.source,
             "last_synced_at": wallet.last_synced_at.isoformat() if wallet.last_synced_at else None,
+            "last_score_at": wallet.last_score_at.isoformat() if wallet.last_score_at else None,
+            "last_ai_at": wallet.last_ai_at.isoformat() if wallet.last_ai_at else None,
+            "next_score_due": wallet.next_score_due.isoformat() if wallet.next_score_due else None,
+            "last_error": wallet.last_error,
             "created_at": wallet.created_at.isoformat(),
             "metric": metric_dict,
             "metric_period": normalized_period if metric_dict else None,
@@ -253,9 +251,16 @@ def get_wallet_detail(address: str) -> Optional[dict]:
     data = {
         "address": wallet.address,
         "status": wallet.status,
+        "sync_status": wallet.sync_status,
+        "score_status": wallet.score_status,
+        "ai_status": wallet.ai_status,
         "tags": normalized_tags,
         "source": wallet.source,
         "last_synced_at": wallet.last_synced_at.isoformat() if wallet.last_synced_at else None,
+        "last_score_at": wallet.last_score_at.isoformat() if wallet.last_score_at else None,
+        "last_ai_at": wallet.last_ai_at.isoformat() if wallet.last_ai_at else None,
+        "next_score_due": wallet.next_score_due.isoformat() if wallet.next_score_due else None,
+        "last_error": wallet.last_error,
         "created_at": wallet.created_at.isoformat(),
     }
     metric_dict = _serialize_sa(metric)
@@ -271,7 +276,7 @@ def get_wallet_overview() -> dict:
     with session_scope() as session:
         total_wallets = session.execute(select(func.count()).select_from(Wallet)).scalar_one()
         synced_wallets = (
-            session.execute(select(func.count()).select_from(Wallet).where(Wallet.status == "synced")).scalar_one()
+            session.execute(select(func.count()).select_from(Wallet).where(Wallet.sync_status == "synced")).scalar_one()
             if total_wallets
             else 0
         )

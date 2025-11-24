@@ -18,7 +18,6 @@ from app.schemas.wallets import (
     WalletImportHistoryResponse,
 )
 from app.services.wallet_importer import import_wallets
-from app.services import etl
 from app.services import query as query_service
 from app.services import scoring
 from app.services import task_queue
@@ -51,19 +50,11 @@ def wallets_import_history(
 
 @router.post("/wallets/sync", response_model=WalletSyncResponse, summary="Sync wallet data from Hyperliquid")
 def wallets_sync(payload: WalletSyncRequest = Body(...)) -> WalletSyncResponse:
-    ledger = etl.sync_ledger(payload.address, end_time=payload.end_time)
-    fills = etl.sync_fills(payload.address, end_time=payload.end_time)
-    positions = etl.sync_positions(payload.address)
-    orders = etl.sync_orders(payload.address)
-    portfolio_points = etl.sync_portfolio_series(payload.address)
-    wallets_service.update_sync_status(payload.address)
-    return WalletSyncResponse(
-        fills=fills,
-        ledger=ledger,
-        positions=positions,
-        orders=orders,
-        portfolio_points=portfolio_points,
-    )
+    try:
+        result = task_queue.run_wallet_sync(payload.address, end_time=payload.end_time, scheduled_by="api")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return WalletSyncResponse(**result)
 
 
 @router.post(
@@ -72,7 +63,10 @@ def wallets_sync(payload: WalletSyncRequest = Body(...)) -> WalletSyncResponse:
     summary="后台同步钱包数据（RQ 队列）",
 )
 def wallets_sync_async(payload: WalletSyncRequest = Body(...)) -> JobEnqueueResponse:
-    job_id = task_queue.enqueue_wallet_sync(payload.address, end_time=payload.end_time)
+    try:
+        job_id = task_queue.enqueue_wallet_sync(payload.address, end_time=payload.end_time, scheduled_by="api")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
     return JobEnqueueResponse(job_id=job_id)
 
 

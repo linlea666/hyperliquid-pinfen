@@ -33,6 +33,7 @@ class WalletImportResult(BaseModel):
     status: str
     message: Optional[str] = None
     tags_applied: List[str] = Field(default_factory=list)
+    job_id: Optional[str] = None
 
 
 class WalletImportResponse(BaseModel):
@@ -118,9 +119,16 @@ class TagSummary(BaseModel):
 class WalletSummary(BaseModel):
     address: str
     status: str
+    sync_status: Optional[str] = None
+    score_status: Optional[str] = None
+    ai_status: Optional[str] = None
     tags: List[TagSummary] = Field(default_factory=list)
     source: str
     last_synced_at: Optional[str] = None
+    last_score_at: Optional[str] = None
+    last_ai_at: Optional[str] = None
+    next_score_due: Optional[str] = None
+    last_error: Optional[str] = None
     created_at: str
     metric: Optional[dict] = None
     metric_period: Optional[str] = None

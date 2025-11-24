@@ -19,6 +19,7 @@ class OrderHistory(Base):
     sz = Column(Numeric(38, 18))
     order_type = Column(String(32))
     tif = Column(String(32))
+    oid = Column(BigInteger, nullable=True, index=True)
     reduce_only = Column(Integer)  # store as 0/1
     is_trigger = Column(Integer)  # store as 0/1
     trigger_px = Column(Numeric(38, 18))

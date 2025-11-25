@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, desc, func, select
+from sqlalchemy import and_, asc, desc, func, select, case
 
 from app.core.database import session_scope
 from app.models import (
@@ -158,7 +158,8 @@ def list_wallets(
         sort_column = sort_key_map.get(sort_key or "")
         if sort_column is not None:
             order_fn = desc if sort_order.lower() == "desc" else asc
-            data_query = data_query.order_by(order_fn(sort_column).nulls_last(), desc(Wallet.created_at))
+            nulls_last_expr = case((sort_column.is_(None), 1), else_=0)
+            data_query = data_query.order_by(nulls_last_expr, order_fn(sort_column), desc(Wallet.created_at))
         else:
             data_query = data_query.order_by(desc(Wallet.created_at))
 

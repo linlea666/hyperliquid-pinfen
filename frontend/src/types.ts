@@ -212,3 +212,32 @@ export interface ProcessingLog {
 export interface ProcessingLogListResponse {
   items: ProcessingLog[];
 }
+
+export interface ScoringIndicatorConfig {
+  field: string;
+  min: number;
+  max: number;
+  higher_is_better: boolean;
+  weight: number;
+}
+
+export interface ScoringDimensionConfig {
+  key: string;
+  name: string;
+  weight: number;
+  indicators: ScoringIndicatorConfig[];
+}
+
+export interface ScoringLevelConfig {
+  level: string;
+  min_score: number;
+}
+
+export interface ScoringConfig {
+  dimensions: ScoringDimensionConfig[];
+  levels: ScoringLevelConfig[];
+}
+
+export interface ScoringConfigResponse {
+  config: ScoringConfig;
+}

@@ -1,7 +1,14 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost } from '../api/client';
-import type { Schedule, TemplateResponse, SubscriptionResponse, PreferenceResponse } from '../types';
+import type {
+  Schedule,
+  TemplateResponse,
+  SubscriptionResponse,
+  PreferenceResponse,
+  ScoringConfigResponse,
+  ScoringConfig,
+} from '../types';
 
 export default function AdminPanel() {
   const [email, setEmail] = useState('');
@@ -26,6 +33,18 @@ export default function AdminPanel() {
   const [newSub, setNewSub] = useState({ template_id: '', recipient: '' });
   const [newSchedule, setNewSchedule] = useState({ name: '', job_type: 'leaderboard_run_all', cron: '0 * * * *', address: '' });
   const [prefs, setPrefs] = useState<PreferenceResponse | null>(null);
+  const { data: scoringConfigResp, refetch: refetchScoringConfig } = useQuery<ScoringConfigResponse>({
+    queryKey: ['scoring-config'],
+    queryFn: () => apiGet<ScoringConfigResponse>('/scoring/config'),
+  });
+  const [scoringDraft, setScoringDraft] = useState<ScoringConfig | null>(null);
+  const [triggerRescore, setTriggerRescore] = useState(false);
+
+  useEffect(() => {
+    if (scoringConfigResp) {
+      setScoringDraft(JSON.parse(JSON.stringify(scoringConfigResp.config)));
+    }
+  }, [scoringConfigResp]);
 
   const loadPrefs = async () => {
     if (!email) return;
@@ -38,6 +57,23 @@ export default function AdminPanel() {
     if (!email || !prefs) return;
     await apiPost(`/admin/preferences?email=${encodeURIComponent(email)}`, prefs);
     setMessage('用户偏好已保存');
+  };
+
+  const updateScoringDraft = (updater: (draft: ScoringConfig) => void) => {
+    setScoringDraft((prev) => {
+      if (!prev) return prev;
+      const next = JSON.parse(JSON.stringify(prev)) as ScoringConfig;
+      updater(next);
+      return next;
+    });
+  };
+
+  const saveScoringConfig = async () => {
+    if (!scoringDraft) return;
+    await apiPost('/scoring/config', { config: scoringDraft, trigger_rescore: triggerRescore });
+    setMessage(triggerRescore ? '评分配置已保存并触发重算' : '评分配置已保存');
+    setTriggerRescore(false);
+    await refetchScoringConfig();
   };
 
   return (
@@ -192,6 +228,104 @@ export default function AdminPanel() {
         <button className="btn primary" onClick={savePrefs} disabled={!prefs}>
           保存偏好
         </button>
+      </section>
+
+      <section className="card">
+        <h3>评分配置</h3>
+        {!scoringDraft && <p className="muted">加载中...</p>}
+        {scoringDraft && (
+          <>
+            <div className="filters">
+              <label>
+                <input type="checkbox" checked={triggerRescore} onChange={(e) => setTriggerRescore(e.target.checked)} />
+                保存后重新评分所有钱包
+              </label>
+            </div>
+            <div className="settings-grid">
+              {scoringDraft.dimensions.map((dim, idx) => (
+                <div key={dim.key} className="card" style={{ background: 'rgba(255,255,255,0.02)' }}>
+                  <h4>{dim.name}</h4>
+                  <label>
+                    权重
+                    <input
+                      type="number"
+                      value={dim.weight}
+                      onChange={(e) => updateScoringDraft((next) => {
+                        next.dimensions[idx].weight = Number(e.target.value);
+                      })}
+                    />
+                  </label>
+                  <p className="muted">指标</p>
+                  {dim.indicators.map((indicator, indIdx) => (
+                    <div key={`${indicator.field}-${indIdx}`} className="indicator-grid">
+                      <span>{indicator.field}</span>
+                      <input
+                        type="number"
+                        value={indicator.min}
+                        onChange={(e) => updateScoringDraft((next) => {
+                          next.dimensions[idx].indicators[indIdx].min = Number(e.target.value);
+                        })}
+                      />
+                      <input
+                        type="number"
+                        value={indicator.max}
+                        onChange={(e) => updateScoringDraft((next) => {
+                          next.dimensions[idx].indicators[indIdx].max = Number(e.target.value);
+                        })}
+                      />
+                      <label className="checkbox-row">
+                        <input
+                          type="checkbox"
+                          checked={indicator.higher_is_better}
+                          onChange={(e) => updateScoringDraft((next) => {
+                            next.dimensions[idx].indicators[indIdx].higher_is_better = e.target.checked;
+                          })}
+                        />
+                        越高越好
+                      </label>
+                      <input
+                        type="number"
+                        value={indicator.weight}
+                        onChange={(e) => updateScoringDraft((next) => {
+                          next.dimensions[idx].indicators[indIdx].weight = Number(e.target.value);
+                        })}
+                      />
+                    </div>
+                  ))}
+                </div>
+              ))}
+            </div>
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>等级</th>
+                    <th>最低分</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {scoringDraft.levels.map((level, idx) => (
+                    <tr key={level.level}>
+                      <td>{level.level}</td>
+                      <td>
+                    <input
+                      type="number"
+                      value={level.min_score}
+                      onChange={(e) => updateScoringDraft((next) => {
+                        next.levels[idx].min_score = Number(e.target.value);
+                      })}
+                    />
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <button className="btn primary" onClick={saveScoringConfig}>
+              保存评分配置
+            </button>
+          </>
+        )}
       </section>
 
       {message && <p className="muted">{message}</p>}

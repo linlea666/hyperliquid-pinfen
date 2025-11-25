@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import BigInteger, Column, DateTime, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import BigInteger, Column, DateTime, Integer, Numeric, String, Text, UniqueConstraint
 
 from app.core.database import Base
 
@@ -22,6 +22,7 @@ class WalletMetric(Base):
     volume = Column(Numeric(38, 18))
     max_drawdown = Column(Numeric(38, 18))
     avg_pnl = Column(Numeric(38, 18))
+    details = Column(Text, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
@@ -38,3 +39,4 @@ class WalletScore(Base):
     level = Column(String(8))
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     metrics_id = Column(Integer)
+    dimension_scores = Column(Text, nullable=True)

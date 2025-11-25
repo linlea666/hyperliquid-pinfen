@@ -1,3 +1,4 @@
+import json
 import logging
 from decimal import Decimal
 from typing import Tuple
@@ -6,12 +7,26 @@ from sqlalchemy import asc, select
 
 from app.core.database import session_scope
 from app.models import Fill, WalletMetric, WalletScore
+from app.services import scoring_config
 
 logger = logging.getLogger(__name__)
 
 
+def _normalize(value: float, indicator: dict) -> float:
+    minimum = indicator.get("min", 0)
+    maximum = indicator.get("max", 1)
+    if maximum == minimum:
+        return 0.0
+    norm = (value - minimum) / (maximum - minimum)
+    if not indicator.get("higher_is_better", True):
+        norm = 1 - norm
+    norm = max(0.0, min(1.0, norm))
+    return norm * 100
+
+
 def compute_metrics(user: str) -> Tuple[WalletMetric, WalletScore]:
-    """Compute basic metrics and a naive score/level."""
+    """Compute metrics and score based on configurable dimensions."""
+    config = scoring_config.get_scoring_config()
     with session_scope() as session:
         fills = (
             session.execute(select(Fill).where(Fill.user == user).order_by(asc(Fill.time_ms)))
@@ -19,26 +34,8 @@ def compute_metrics(user: str) -> Tuple[WalletMetric, WalletScore]:
             .all()
         )
         trades = len(fills)
-        if trades == 0:
-            import time
-            now_ms = int(time.time() * 1000)
-            metric = WalletMetric(
-                user=user,
-                as_of=now_ms,
-                trades=0,
-                wins=0,
-                losses=0,
-                win_rate=Decimal(0),
-                total_pnl=Decimal(0),
-                total_fees=Decimal(0),
-                volume=Decimal(0),
-                max_drawdown=Decimal(0),
-                avg_pnl=Decimal(0),
-            )
-            session.add(metric)
-            score = WalletScore(user=user, as_of=now_ms, score=Decimal(0), level="N/A", metrics_id=None)
-            session.add(score)
-            return metric, score
+        import time
+        now_ms = int(time.time() * 1000)
 
         total_pnl = Decimal(0)
         total_fees = Decimal(0)
@@ -71,8 +68,24 @@ def compute_metrics(user: str) -> Tuple[WalletMetric, WalletScore]:
                 max_drawdown = drawdown
 
         win_rate = Decimal(wins) / Decimal(trades) if trades else Decimal(0)
-        avg_pnl = total_pnl / Decimal(trades)
-        as_of = fills[-1].time_ms
+        avg_pnl = total_pnl / Decimal(trades) if trades else Decimal(0)
+        as_of = fills[-1].time_ms if fills else now_ms
+
+        details = {
+            "total_pnl": float(total_pnl),
+            "total_fees": float(total_fees),
+            "avg_pnl": float(avg_pnl),
+            "win_rate": float(win_rate),
+            "max_drawdown": float(max_drawdown),
+            "volume": float(volume),
+            "trades": trades,
+        }
+        details["equity_stability"] = max(
+            0.0, min(1.0, 1 - float(max_drawdown / (abs(total_pnl) + Decimal(1))))
+        )
+        details["capital_efficiency"] = max(
+            0.0, min(1.0, float((abs(total_pnl) + Decimal(1)) / (volume + Decimal(1))))
+        )
 
         metric = WalletMetric(
             user=user,
@@ -86,19 +99,46 @@ def compute_metrics(user: str) -> Tuple[WalletMetric, WalletScore]:
             volume=volume,
             max_drawdown=max_drawdown,
             avg_pnl=avg_pnl,
+            details=json.dumps(details),
         )
         session.add(metric)
         session.flush()  # to get id
 
-        # naive scoring: weighted blend
-        score_val = (
-            float(win_rate) * 40
-            + float(total_pnl / (abs(total_pnl) + Decimal(1))) * 30
-            + float((volume and (total_pnl / (volume + Decimal(1))))) * 20
-            - float(max_drawdown / (abs(total_pnl) + Decimal(1))) * 10
+        dimension_scores = {}
+        total_weight = sum(dim.get("weight", 0) for dim in config.get("dimensions", [])) or 1
+        for dim in config.get("dimensions", []):
+            indicators = dim.get("indicators", [])
+            indicator_weight_sum = sum(ind.get("weight", 1) for ind in indicators) or 1
+            score_acc = 0.0
+            for indicator in indicators:
+                field = indicator.get("field")
+                value = details.get(field, 0.0)
+                normalized = _normalize(value, indicator)
+                score_acc += normalized * indicator.get("weight", 1)
+            dimension_score = score_acc / indicator_weight_sum if indicators else 0.0
+            dimension_scores[dim.get("key", dim.get("name"))] = dimension_score
+
+        overall_score = 0.0
+        for dim in config.get("dimensions", []):
+            key = dim.get("key", dim.get("name"))
+            weight = dim.get("weight", 0)
+            overall_score += dimension_scores.get(key, 0) * weight
+        overall_score = (overall_score / total_weight) if total_weight else 0.0
+        overall_score = max(0.0, min(100.0, overall_score))
+
+        level = "N/A"
+        for entry in sorted(config.get("levels", []), key=lambda x: x.get("min_score", 0), reverse=True):
+            if overall_score >= entry.get("min_score", 0):
+                level = entry.get("level", "N/A")
+                break
+
+        score = WalletScore(
+            user=user,
+            as_of=as_of,
+            score=Decimal(str(round(overall_score, 2))),
+            level=level,
+            metrics_id=metric.id,
+            dimension_scores=json.dumps(dimension_scores),
         )
-        score_val = max(0.0, min(100.0, score_val))
-        level = "S" if score_val >= 90 else "A+" if score_val >= 80 else "A" if score_val >= 70 else "B" if score_val >= 60 else "C"
-        score = WalletScore(user=user, as_of=as_of, score=Decimal(str(round(score_val, 2))), level=level, metrics_id=metric.id)
         session.add(score)
         return metric, score

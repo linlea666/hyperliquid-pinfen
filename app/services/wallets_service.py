@@ -126,6 +126,7 @@ def list_wallets(
                 WalletMetric.losses.label("metric_losses"),
                 WalletMetric.as_of.label("metric_as_of"),
                 WalletMetric.created_at.label("metric_created_at"),
+                WalletMetric.details.label("metric_details"),
             )
             .join(
                 metric_latest,
@@ -198,6 +199,11 @@ def list_wallets(
                 if metric_row.metric_created_at is not None
                 else None,
             }
+            if getattr(metric_row, "metric_details", None):
+                try:
+                    metric_dict["details"] = json.loads(metric_row.metric_details)
+                except Exception:
+                    metric_dict["details"] = None
         return {
             "address": wallet.address,
             "status": wallet.status,
@@ -264,7 +270,17 @@ def get_wallet_detail(address: str) -> Optional[dict]:
         "created_at": wallet.created_at.isoformat(),
     }
     metric_dict = _serialize_sa(metric)
+    if metric_dict and metric.details:
+        try:
+            metric_dict["details"] = json.loads(metric.details)
+        except Exception:
+            pass
     score_dict = _serialize_sa(score)
+    if score_dict and score.dimension_scores:
+        try:
+            score_dict["dimension_scores"] = json.loads(score.dimension_scores)
+        except Exception:
+            pass
     if metric_dict:
         data["metric"] = metric_dict
     if score_dict:

@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost } from '../api/client';
-import type { OperationsReport, TaskListResponse, Schedule } from '../types';
+import type { OperationsReport, TaskListResponse, Schedule, ProcessingLogListResponse, ProcessingLog } from '../types';
 
 export default function Operations() {
   const { data: report } = useQuery<OperationsReport>({
@@ -18,6 +18,18 @@ export default function Operations() {
     queryKey: ['schedules'],
     queryFn: () => apiGet<Schedule[]>('/schedules'),
   });
+  const [stageFilter, setStageFilter] = useState<'all' | 'sync' | 'score' | 'ai'>('all');
+  const {
+    data: processingLogs,
+    refetch: refetchProcessingLogs,
+  } = useQuery<ProcessingLogListResponse>({
+    queryKey: ['processing-logs', stageFilter],
+    queryFn: () =>
+      apiGet<ProcessingLogListResponse>('/processing/logs', {
+        stage: stageFilter === 'all' ? undefined : stageFilter,
+        limit: 30,
+      }),
+  });
 
   const [newSchedule, setNewSchedule] = useState({
     name: '',
@@ -25,6 +37,12 @@ export default function Operations() {
     cron: '0 * * * *',
     address: '',
   });
+
+  const handleRetry = async (log: ProcessingLog) => {
+    await apiPost('/processing/retry', { address: log.wallet_address, stage: log.stage });
+    await refetchProcessingLogs();
+    await refetchSchedules();
+  };
 
   return (
     <div className="page">
@@ -75,6 +93,61 @@ export default function Operations() {
                   <td>{task.finished_at ? new Date(task.finished_at).toLocaleString() : '-'}</td>
                 </tr>
               ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <section className="card">
+        <h3>分析处理流水</h3>
+        <div className="filters">
+          <select value={stageFilter} onChange={(e) => setStageFilter(e.target.value as any)}>
+            <option value="all">全部阶段</option>
+            <option value="sync">同步</option>
+            <option value="score">评分</option>
+            <option value="ai">AI 分析</option>
+          </select>
+        </div>
+        <div className="table-wrapper">
+          <table>
+            <thead>
+              <tr>
+                <th>钱包</th>
+                <th>阶段</th>
+                <th>状态</th>
+                <th>尝试</th>
+                <th>来源</th>
+                <th>开始时间</th>
+                <th>结束时间</th>
+                <th>错误信息</th>
+                <th>操作</th>
+              </tr>
+            </thead>
+            <tbody>
+              {processingLogs?.items.map((log) => (
+                <tr key={log.id}>
+                  <td>{log.wallet_address}</td>
+                  <td>{log.stage}</td>
+                  <td>{log.status}</td>
+                  <td>{log.attempt}</td>
+                  <td>{log.scheduled_by}</td>
+                  <td>{log.started_at ? new Date(log.started_at).toLocaleString() : '-'}</td>
+                  <td>{log.finished_at ? new Date(log.finished_at).toLocaleString() : '-'}</td>
+                  <td className="muted">{log.error ?? '-'}</td>
+                  <td>
+                    <button className="btn small" onClick={() => handleRetry(log)}>
+                      重试
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {!processingLogs?.items.length && (
+                <tr>
+                  <td colSpan={9} className="muted">
+                    暂无流水
+                  </td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>

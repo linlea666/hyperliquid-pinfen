@@ -22,6 +22,7 @@ from app.services import query as query_service
 from app.services import scoring
 from app.services import task_queue
 from app.services import wallets_service
+from app.services import processing as processing_service
 
 router = APIRouter()
 
@@ -72,7 +73,10 @@ def wallets_sync_async(payload: WalletSyncRequest = Body(...)) -> JobEnqueueResp
 
 @router.get("/wallets/status/{address}", response_model=CursorStatusResponse, summary="查看钱包同步游标")
 def wallets_status(address: str) -> CursorStatusResponse:
-    return CursorStatusResponse(cursors=query_service.get_cursors(address))
+    snapshot = processing_service.get_wallet_snapshot(address)
+    if snapshot is None:
+        raise HTTPException(status_code=404, detail="wallet not found")
+    return CursorStatusResponse(cursors=query_service.get_cursors(address), **snapshot)
 
 
 @router.get(

@@ -2,7 +2,7 @@ import json
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import func, select
+from sqlalchemy import desc, func, select
 
 from app.core.database import session_scope
 from app.models import Wallet, WalletProcessingLog
@@ -131,3 +131,45 @@ def mark_stage_failure(log_id: int, error: str) -> None:
         log.error = error
         log.finished_at = datetime.utcnow()
         session.add(log)
+
+
+def list_logs(
+    address: Optional[str] = None,
+    stage: Optional[str] = None,
+    status: Optional[str] = None,
+    limit: int = 50,
+    offset: int = 0,
+):
+    limit = min(max(limit, 1), 200)
+    offset = max(offset, 0)
+    with session_scope() as session:
+        stmt = (
+            select(WalletProcessingLog)
+            .order_by(desc(WalletProcessingLog.created_at))
+            .offset(offset)
+            .limit(limit)
+        )
+        if address:
+            stmt = stmt.where(WalletProcessingLog.wallet_address == address)
+        if stage:
+            stmt = stmt.where(WalletProcessingLog.stage == stage)
+        if status:
+            stmt = stmt.where(WalletProcessingLog.status == status)
+        return session.execute(stmt).scalars().all()
+
+
+def get_wallet_snapshot(address: str) -> Optional[dict]:
+    with session_scope() as session:
+        wallet = session.execute(select(Wallet).where(Wallet.address == address)).scalar_one_or_none()
+    if not wallet:
+        return None
+    return {
+        "sync_status": wallet.sync_status,
+        "score_status": wallet.score_status,
+        "ai_status": wallet.ai_status,
+        "last_synced_at": wallet.last_synced_at.isoformat() if wallet.last_synced_at else None,
+        "last_score_at": wallet.last_score_at.isoformat() if wallet.last_score_at else None,
+        "last_ai_at": wallet.last_ai_at.isoformat() if wallet.last_ai_at else None,
+        "next_score_due": wallet.next_score_due.isoformat() if wallet.next_score_due else None,
+        "last_error": wallet.last_error,
+    }

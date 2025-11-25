@@ -1,7 +1,7 @@
 import json
 from typing import List
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, Query, HTTPException
 
 from app.api.deps import get_current_user
 from app.schemas.notifications import (
@@ -13,13 +13,22 @@ from app.schemas.notifications import (
     TemplateResponse,
 )
 from app.schemas.reports import OperationsReport
-from app.schemas.tasks import TaskListResponse, TaskRecordResponse
+from app.schemas.tasks import (
+    TaskListResponse,
+    TaskRecordResponse,
+    ProcessingLogListResponse,
+    ProcessingLogResponse,
+    ProcessingRetryRequest,
+    ProcessingRetryResponse,
+)
 from app.schemas.schedule import ScheduleCreate, ScheduleResponse
 from app.services import notifications as notification_service
 from app.services import tasks_service
 from app.services import wallets_service
 from app.services.notifications import list_history
 from app.services import scheduler as scheduler_service
+from app.services import processing as processing_service
+from app.services import task_queue
 
 
 router = APIRouter()
@@ -41,6 +50,35 @@ def list_tasks(status: str | None = None, task_type: str | None = None, limit: i
                 finished_at=item.finished_at.isoformat() if item.finished_at else None,
             )
             for item in items
+        ]
+    )
+
+
+@router.get("/processing/logs", response_model=ProcessingLogListResponse, dependencies=[Depends(get_current_user)])
+def list_processing_logs(
+    wallet: str | None = None,
+    stage: str | None = Query(None, pattern="^(sync|score|ai)$"),
+    status: str | None = None,
+    limit: int = Query(50, ge=1, le=200),
+):
+    logs = processing_service.list_logs(address=wallet, stage=stage, status=status, limit=limit)
+    return ProcessingLogListResponse(
+        items=[
+            ProcessingLogResponse(
+                id=log.id,
+                wallet_address=log.wallet_address,
+                stage=log.stage,
+                status=log.status,
+                attempt=log.attempt,
+                scheduled_by=log.scheduled_by,
+                payload=log.payload,
+                result=log.result,
+                error=log.error,
+                started_at=log.started_at.isoformat() if log.started_at else None,
+                finished_at=log.finished_at.isoformat() if log.finished_at else None,
+                created_at=log.created_at.isoformat(),
+            )
+            for log in logs
         ]
     )
 
@@ -117,6 +155,27 @@ def history(limit: int = Query(50, ge=1, le=200)):
         )
         for rec in records
     ]
+
+
+@router.post("/processing/retry", response_model=ProcessingRetryResponse, dependencies=[Depends(get_current_user)])
+def retry_processing(payload: ProcessingRetryRequest):
+    stage = payload.stage
+    if stage not in {"sync", "score", "ai"}:
+        raise HTTPException(status_code=400, detail="invalid stage")
+    try:
+        if stage == "sync":
+            job_id = task_queue.enqueue_wallet_sync(payload.address, scheduled_by="manual")
+        elif stage == "score":
+            job_id = task_queue.enqueue_wallet_score(payload.address, scheduled_by="manual")
+            if job_id is None:
+                raise HTTPException(status_code=400, detail="score stage already pending or wallet不存在")
+        else:
+            job_id = task_queue.enqueue_wallet_ai(payload.address, scheduled_by="manual")
+            if job_id is None:
+                raise HTTPException(status_code=400, detail="AI stage已在队列或钱包不存在")
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc))
+    return ProcessingRetryResponse(stage=stage, job_id=job_id)
 
 
 @router.get("/reports/operations", response_model=OperationsReport, dependencies=[Depends(get_current_user)])

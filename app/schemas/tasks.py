@@ -16,3 +16,32 @@ class TaskRecordResponse(BaseModel):
 
 class TaskListResponse(BaseModel):
     items: List[TaskRecordResponse]
+
+
+class ProcessingLogResponse(BaseModel):
+    id: int
+    wallet_address: str
+    stage: str
+    status: str
+    attempt: int
+    scheduled_by: str
+    payload: Optional[str] = None
+    result: Optional[str] = None
+    error: Optional[str] = None
+    started_at: Optional[str] = None
+    finished_at: Optional[str] = None
+    created_at: str
+
+
+class ProcessingLogListResponse(BaseModel):
+    items: List[ProcessingLogResponse]
+
+
+class ProcessingRetryRequest(BaseModel):
+    address: str
+    stage: str  # sync | score | ai
+
+
+class ProcessingRetryResponse(BaseModel):
+    stage: str
+    job_id: Optional[str] = None

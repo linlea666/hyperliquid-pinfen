@@ -193,3 +193,22 @@ export interface WalletImportHistoryResponse {
   total: number;
   items: WalletImportHistoryEntry[];
 }
+
+export interface ProcessingLog {
+  id: number;
+  wallet_address: string;
+  stage: string;
+  status: string;
+  attempt: number;
+  scheduled_by: string;
+  payload?: string;
+  result?: string;
+  error?: string;
+  started_at?: string;
+  finished_at?: string;
+  created_at: string;
+}
+
+export interface ProcessingLogListResponse {
+  items: ProcessingLog[];
+}

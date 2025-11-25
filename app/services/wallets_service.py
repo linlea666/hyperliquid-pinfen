@@ -167,7 +167,9 @@ def list_wallets(
         rows = session.execute(data_query).all()
         wallets: List[Wallet] = []
         metric_rows: Dict[str, Any] = {}
-        for wallet_obj, metric_obj in rows:
+        for row in rows:
+            wallet_obj = row[0]
+            metric_obj = row[1] if len(row) > 1 else None
             wallets.append(wallet_obj)
             metric_rows[wallet_obj.address] = metric_obj
         addresses = [wallet.address for wallet in wallets]

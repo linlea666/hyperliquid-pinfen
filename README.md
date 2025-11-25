@@ -107,6 +107,7 @@ curl -X POST -H "Authorization: Bearer $TOKEN" http://127.0.0.1:8000/api/leaderb
 - `frontend/`：React + Vite 前端工程（仪表盘、钱包列表/详情、榜单页、AI 展示）。
 - `docs/PROGRESS.md`：阶段性里程碑记录。
 - `docs/processing_pipeline.md`：钱包分析处理管线（导入→同步→评分→AI）设计。
+- `docs/scoring_module.md`：评分模块增强方案（指标、配置、自动标签）。
 
 ### 后台队列（RQ）
 - 配置 `REDIS_URL`（默认 redis://localhost:6379/0），启动 worker：

@@ -294,6 +294,9 @@ def get_wallet_detail(address: str) -> Optional[dict]:
 def get_wallet_overview() -> dict:
     with session_scope() as session:
         total_wallets = session.execute(select(func.count()).select_from(Wallet)).scalar_one()
+        pending_wallets = session.execute(select(func.count()).select_from(Wallet).where(Wallet.sync_status == "pending")).scalar_one()
+        running_wallets = session.execute(select(func.count()).select_from(Wallet).where(Wallet.sync_status == "running")).scalar_one()
+        failed_wallets = session.execute(select(func.count()).select_from(Wallet).where(Wallet.sync_status == "failed")).scalar_one()
         synced_wallets = (
             session.execute(select(func.count()).select_from(Wallet).where(Wallet.sync_status == "synced")).scalar_one()
             if total_wallets
@@ -307,6 +310,9 @@ def get_wallet_overview() -> dict:
     return {
         "total_wallets": total_wallets,
         "synced_wallets": synced_wallets,
+        "pending_wallets": pending_wallets,
+        "running_wallets": running_wallets,
+        "failed_wallets": failed_wallets,
         "ledger_events": ledger_events,
         "fills": fills,
         "last_sync": last_sync.isoformat() if last_sync else None,

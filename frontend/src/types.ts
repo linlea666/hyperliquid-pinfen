@@ -50,6 +50,9 @@ export interface WalletListResponse {
 export interface WalletOverview {
   total_wallets: number;
   synced_wallets: number;
+  pending_wallets: number;
+  running_wallets: number;
+  failed_wallets: number;
   ledger_events: number;
   fills: number;
   last_sync?: string;

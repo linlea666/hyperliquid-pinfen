@@ -57,6 +57,22 @@ export default function Operations() {
             <p className="metric-title">已同步</p>
             <p className="metric-value">{report ? `${report.synced_wallets}/${report.wallet_total}` : '--'}</p>
           </div>
+          {report && 'pending_wallets' in report && (
+            <>
+              <div className="metric-card">
+                <p className="metric-title">待同步</p>
+                <p className="metric-value">{(report as any).pending_wallets}</p>
+              </div>
+              <div className="metric-card">
+                <p className="metric-title">同步中</p>
+                <p className="metric-value">{(report as any).running_wallets}</p>
+              </div>
+              <div className="metric-card">
+                <p className="metric-title">同步失败</p>
+                <p className="metric-value">{(report as any).failed_wallets}</p>
+              </div>
+            </>
+          )}
           <div className="metric-card">
             <p className="metric-title">任务运行中</p>
             <p className="metric-value">{report?.tasks_running ?? '--'}</p>

@@ -137,7 +137,7 @@ class WalletSummary(BaseModel):
     last_ai_at: Optional[str] = None
     next_score_due: Optional[str] = None
     last_error: Optional[str] = None
-     note: Optional[str] = None
+    note: Optional[str] = None
     created_at: str
     metric: Optional[dict] = None
     metric_period: Optional[str] = None

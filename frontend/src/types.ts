@@ -52,6 +52,8 @@ export interface WalletSummary {
   last_score_at?: string;
   last_ai_at?: string;
   next_score_due?: string;
+  next_sync_due?: string;
+  next_ai_due?: string;
   last_error?: string;
   note?: string | null;
   created_at: string;
@@ -89,6 +91,11 @@ export interface LatestRecords {
   fills: any[];
   positions: any[];
   orders: any[];
+}
+
+export interface PaginatedResponse<T> {
+  items: T[];
+  total: number;
 }
 
 export interface LeaderboardResponse {
@@ -247,10 +254,20 @@ export interface ProcessingStageStats {
   counts: Record<string, number>;
 }
 
+export interface ProcessingScopeInfo {
+  type: string;
+  recent_days?: number;
+  tag?: string;
+  description: string;
+}
+
 export interface ProcessingSummaryResponse {
   stages: ProcessingStageStats[];
   pending_rescore: number;
+  pending_wallets: number;
   queue_size: number;
+  batch_estimate_seconds: number;
+  scope: ProcessingScopeInfo;
   last_failed: ProcessingLog[];
 }
 
@@ -291,8 +308,32 @@ export interface ProcessingConfig {
   rescore_period_days: number;
   rescore_trigger_pct: number;
   ai_period_days: number;
+  scope_type: string;
+  scope_recent_days: number;
+  scope_tag: string;
+  batch_size: number;
+  batch_interval_seconds: number;
+  request_rate_per_min: number;
+  sync_cooldown_days: number;
+  score_cooldown_days: number;
+  ai_cooldown_days: number;
+}
+
+export interface ProcessingTemplate {
+  key: string;
+  name: string;
+  description: string;
+  overrides: Record<string, string | number>;
 }
 
 export interface ProcessingConfigResponse {
   config: ProcessingConfig;
+  templates: ProcessingTemplate[];
+  active_template?: string;
+}
+
+export interface ProcessingBatchResponse {
+  requested: number;
+  enqueued: number;
+  skipped: number;
 }

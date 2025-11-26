@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost } from '../api/client';
 import { showToast } from '../utils/toast';
@@ -9,7 +9,31 @@ import type {
   ProcessingLogListResponse,
   ProcessingLog,
   ProcessingSummaryResponse,
+  ProcessingConfigResponse,
+  ProcessingBatchResponse,
 } from '../types';
+
+const STAGE_SUCCESS_KEYS: Record<string, string> = {
+  sync: 'synced',
+  score: 'scored',
+  ai: 'completed',
+};
+
+const STAGE_LABELS: Record<string, string> = {
+  sync: '同步',
+  score: '评分',
+  ai: 'AI 分析',
+};
+
+const formatDuration = (seconds: number): string => {
+  if (!seconds || seconds <= 0) return '0 分钟';
+  const hrs = Math.floor(seconds / 3600);
+  const mins = Math.floor((seconds % 3600) / 60);
+  if (hrs > 0) {
+    return `${hrs} 小时 ${mins} 分钟`;
+  }
+  return `${mins || 1} 分钟`;
+};
 
 export default function Operations() {
   const { data: report } = useQuery<OperationsReport>({
@@ -49,6 +73,10 @@ export default function Operations() {
     queryKey: ['processing-summary'],
     queryFn: () => apiGet<ProcessingSummaryResponse>('/processing/summary'),
   });
+  const { data: processingConfig } = useQuery<ProcessingConfigResponse>({
+    queryKey: ['processing-config'],
+    queryFn: () => apiGet<ProcessingConfigResponse>('/processing/config'),
+  });
 
   const [newSchedule, setNewSchedule] = useState({
     name: '',
@@ -56,6 +84,7 @@ export default function Operations() {
     cron: '0 * * * *',
     address: '',
   });
+  const [runningBatch, setRunningBatch] = useState(false);
 
   const handleRetry = async (log: ProcessingLog) => {
     try {
@@ -81,6 +110,54 @@ export default function Operations() {
       showToast('调度已创建', 'success');
     } catch (err: any) {
       showToast(err?.message ?? '创建失败', 'error');
+    }
+  };
+
+  const scopeText = processingSummary?.scope?.description ?? '--';
+
+  const stageProgress = useMemo(() => {
+    if (!processingSummary) return [];
+    return processingSummary.stages.map((stage) => {
+      const successKey = STAGE_SUCCESS_KEYS[stage.stage] || 'completed';
+      const counts = stage.counts || {};
+      const success = counts[successKey] ?? 0;
+      const pending = counts.pending ?? 0;
+      const running = counts.running ?? 0;
+      const total = success + pending + running;
+      const percent = total > 0 ? Math.round((success / total) * 100) : 0;
+      return {
+        key: stage.stage,
+        label: STAGE_LABELS[stage.stage] || stage.stage,
+        success,
+        pending: pending + running,
+        percent,
+        total,
+      };
+    });
+  }, [processingSummary]);
+
+  const triggerBatch = async (force = false) => {
+    if (!processingConfig) return;
+    setRunningBatch(true);
+    try {
+      const cfg = processingConfig.config;
+      const payload: Record<string, any> = {
+        scope_type: cfg.scope_type,
+        force,
+      };
+      if (cfg.scope_type === 'recent') {
+        payload.recent_days = cfg.scope_recent_days;
+      }
+      if (cfg.scope_type === 'tag') {
+        payload.tag = cfg.scope_tag;
+      }
+      const res = await apiPost<ProcessingBatchResponse>('/processing/run_batch', payload);
+      showToast(`已提交 ${res.enqueued}/${res.requested} 个钱包`, 'success');
+      await Promise.all([refetchProcessingLogs(), refetchProcessingSummary()]);
+    } catch (err: any) {
+      showToast(err?.message ?? '批量处理提交失败', 'error');
+    } finally {
+      setRunningBatch(false);
     }
   };
 
@@ -162,6 +239,43 @@ export default function Operations() {
         <>
           <section className="card">
             <h3>分析处理概览</h3>
+            <div className="scope-grid">
+              <div className="scope-card">
+                <p className="metric-title">处理范围</p>
+                <p className="metric-value small">{scopeText}</p>
+                <p className="metric-desc">
+                  每批 {processingConfig?.config.batch_size ?? '-'} 条 · 间隔 {processingConfig?.config.batch_interval_seconds ?? '-'} 秒
+                </p>
+                <p className="metric-desc">模板：{processingConfig?.active_template ?? '自定义'}</p>
+              </div>
+              <div className="scope-card">
+                <p className="metric-title">冷却策略</p>
+                <p className="metric-value small">
+                  同步 {processingConfig?.config.sync_cooldown_days ?? '-'} 天 · 评分 {processingConfig?.config.score_cooldown_days ?? '-'} 天 · AI{' '}
+                  {processingConfig?.config.ai_cooldown_days ?? '-'} 天
+                </p>
+                <p className="metric-desc">避免重复处理，可在后台配置调整</p>
+              </div>
+              <div className="scope-card">
+                <p className="metric-title">估计剩余时间</p>
+                <p className="metric-value small">
+                  {processingSummary?.batch_estimate_seconds
+                    ? formatDuration(processingSummary.batch_estimate_seconds)
+                    : '—'}
+                </p>
+                <p className="metric-desc">
+                  待处理 {processingSummary?.pending_wallets ?? '--'} 个钱包
+                </p>
+              </div>
+            </div>
+            <div className="header-actions mt">
+              <button className="btn primary" disabled={runningBatch || !processingConfig} onClick={() => triggerBatch(false)}>
+                {runningBatch ? '批量提交中...' : '按当前范围立即处理'}
+              </button>
+              <button className="btn secondary" disabled={runningBatch || !processingConfig} onClick={() => triggerBatch(true)}>
+                {runningBatch ? '...' : '忽略冷却强制处理'}
+              </button>
+            </div>
             <div className="grid-4">
               <div className="metric-card">
                 <p className="metric-title">处理队列</p>
@@ -173,6 +287,25 @@ export default function Operations() {
                 <p className="metric-value">{processingSummary?.pending_rescore ?? '--'}</p>
                 <p className="metric-desc">next_score_due 到期</p>
               </div>
+            </div>
+            <div className="progress-grid">
+              {stageProgress.map((stage) => (
+                <div key={stage.key} className="progress-card">
+                  <div className="progress-header">
+                    <strong>{stage.label}</strong>
+                    <span>
+                      {stage.success}/{stage.total || '0'} (已完成)
+                    </span>
+                  </div>
+                  <div className="progress-track">
+                    <div className="progress-fill" style={{ width: `${stage.percent}%` }} />
+                  </div>
+                  <p className="metric-desc small">
+                    待处理 {stage.pending} · 完成 {stage.success} · 进度 {stage.percent}%
+                  </p>
+                </div>
+              ))}
+              {!stageProgress.length && <p className="muted">暂无进度数据</p>}
             </div>
             <div className="table-wrapper mt">
               <table>

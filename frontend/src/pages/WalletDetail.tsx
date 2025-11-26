@@ -5,7 +5,7 @@ import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'rec
 import MetricCard from '../components/MetricCard';
 import { apiGet, apiPost } from '../api/client';
 import { showToast } from '../utils/toast';
-import type { LatestRecords, WalletSummary, WalletNoteResponse } from '../types';
+import type { LatestRecords, WalletSummary, WalletNoteResponse, PaginatedResponse } from '../types';
 import type { AIAnalysisResponse } from '../types';
 
 const PERIOD_OPTIONS = [
@@ -24,6 +24,10 @@ export default function WalletDetail() {
   const [savingNote, setSavingNote] = useState(false);
   const [selectedPeriod, setSelectedPeriod] = useState('30d');
   const [tradePage, setTradePage] = useState(0);
+  const [ledgerPage, setLedgerPage] = useState(0);
+  const [orderPage, setOrderPage] = useState(0);
+  const [historyTab, setHistoryTab] = useState<'trades' | 'ledger' | 'orders'>('trades');
+  const PAGE_SIZE = 20;
 
   const { data: detail, isLoading, error } = useQuery<WalletSummary>({
     queryKey: ['wallet', address],
@@ -49,9 +53,19 @@ export default function WalletDetail() {
     enabled: Boolean(address),
     retry: 0,
   });
-  const { data: tradesData } = useQuery<{ items: any[]; total: number }>({
+  const { data: tradesData } = useQuery<PaginatedResponse<any>>({
     queryKey: ['wallet-fills', address, tradePage],
-    queryFn: () => apiGet('/wallets/fills', { address, limit: 20, offset: tradePage * 20 }),
+    queryFn: () => apiGet('/wallets/fills', { address, limit: PAGE_SIZE, offset: tradePage * PAGE_SIZE }),
+    enabled: Boolean(address),
+  });
+  const { data: ledgerData } = useQuery<PaginatedResponse<any>>({
+    queryKey: ['wallet-ledger', address, ledgerPage],
+    queryFn: () => apiGet('/wallets/ledger', { address, limit: PAGE_SIZE, offset: ledgerPage * PAGE_SIZE }),
+    enabled: Boolean(address),
+  });
+  const { data: orderData } = useQuery<PaginatedResponse<any>>({
+    queryKey: ['wallet-orders', address, orderPage],
+    queryFn: () => apiGet('/wallets/orders', { address, limit: PAGE_SIZE, offset: orderPage * PAGE_SIZE }),
     enabled: Boolean(address),
   });
   useEffect(() => {
@@ -106,7 +120,24 @@ export default function WalletDetail() {
   const selectedStats = periodStats[selectedPeriod];
   const trades = tradesData?.items ?? [];
   const tradeTotal = tradesData?.total ?? trades.length;
-  const tradeTotalPages = Math.max(1, Math.ceil(tradeTotal / 20));
+  const tradeTotalPages = Math.max(1, Math.ceil(tradeTotal / PAGE_SIZE));
+  const ledgerItems = ledgerData?.items ?? [];
+  const ledgerTotal = ledgerData?.total ?? ledgerItems.length;
+  const ledgerTotalPages = Math.max(1, Math.ceil(ledgerTotal / PAGE_SIZE));
+  const orderItems = orderData?.items ?? [];
+  const orderTotal = orderData?.total ?? orderItems.length;
+  const orderTotalPages = Math.max(1, Math.ceil(orderTotal / PAGE_SIZE));
+  const currentPositions = useMemo(() => {
+    if (!latest?.positions?.length) return [];
+    const seen = new Map<string, any>();
+    for (const pos of latest.positions) {
+      const key = pos.coin || pos.symbol || pos.id;
+      if (!seen.has(key)) {
+        seen.set(key, pos);
+      }
+    }
+    return Array.from(seen.values());
+  }, [latest]);
 
   if (isLoading) {
     return <div className="card">加载中...</div>;
@@ -185,6 +216,42 @@ export default function WalletDetail() {
       </section>
 
       <section className="card mt">
+        <h3>当前持仓</h3>
+        {currentPositions.length ? (
+          <div className="table-wrapper">
+            <table>
+              <thead>
+                <tr>
+                  <th>合约</th>
+                  <th>仓位</th>
+                  <th>开仓均价</th>
+                  <th>持仓价值</th>
+                  <th>未实现盈亏</th>
+                  <th>ROE</th>
+                </tr>
+              </thead>
+              <tbody>
+                {currentPositions.map((pos) => (
+                  <tr key={`${pos.coin}-${pos.time_ms}`}>
+                    <td>{pos.coin}</td>
+                    <td>{numberFormatter.format(Number(pos.szi ?? 0))}</td>
+                    <td>{numberFormatter.format(Number(pos.entry_px ?? 0))}</td>
+                    <td>{numberFormatter.format(Number(pos.pos_value ?? 0))}</td>
+                    <td className={Number(pos.unrealized_pnl ?? 0) >= 0 ? 'text-success' : 'text-danger'}>
+                      {numberFormatter.format(Number(pos.unrealized_pnl ?? 0))}
+                    </td>
+                    <td>{formatPercent(Number(pos.roe ?? 0), false)}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <p className="muted">暂无持仓信息</p>
+        )}
+      </section>
+
+      <section className="card mt">
         <h3>收益表现</h3>
         <div className="period-toggle">
           {PERIOD_OPTIONS.map((option) => (
@@ -246,56 +313,163 @@ export default function WalletDetail() {
       </section>
 
       <section className="card mt">
-        <h3>历史交易</h3>
-        <div className="table-wrapper">
+        <h3>历史记录</h3>
+        <div className="period-toggle">
+          <button className={`btn small ${historyTab === 'trades' ? 'primary' : 'ghost'}`} onClick={() => setHistoryTab('trades')}>
+            交易记录
+          </button>
+          <button className={`btn small ${historyTab === 'ledger' ? 'primary' : 'ghost'}`} onClick={() => setHistoryTab('ledger')}>
+            资金流水
+          </button>
+          <button className={`btn small ${historyTab === 'orders' ? 'primary' : 'ghost'}`} onClick={() => setHistoryTab('orders')}>
+            订单状态
+          </button>
+        </div>
+        <div className="table-wrapper mt">
           <table>
             <thead>
-              <tr>
-                <th>时间</th>
-                <th>合约</th>
-                <th>方向</th>
-                <th>价格</th>
-                <th>数量</th>
-                <th>盈亏</th>
-              </tr>
-            </thead>
-            <tbody>
-              {trades.map((item) => (
-                <tr key={`${item.hash}-${item.time_ms}`}>
-                  <td>{item.time_ms ? new Date(Number(item.time_ms)).toLocaleString() : '-'}</td>
-                  <td>{item.coin}</td>
-                  <td>{item.dir || item.side}</td>
-                  <td>{item.px}</td>
-                  <td>{item.sz}</td>
-                  <td className={Number(item.closed_pnl || 0) >= 0 ? 'text-success' : 'text-danger'}>
-                    {numberFormatter.format(Number(item.closed_pnl || 0))}
-                  </td>
-                </tr>
-              ))}
-              {!trades.length && (
+              {historyTab === 'trades' && (
                 <tr>
-                  <td colSpan={6} className="muted">
-                    暂无交易记录
-                  </td>
+                  <th>时间</th>
+                  <th>合约</th>
+                  <th>方向</th>
+                  <th>价格</th>
+                  <th>数量</th>
+                  <th>盈亏</th>
                 </tr>
               )}
+              {historyTab === 'ledger' && (
+                <tr>
+                  <th>时间</th>
+                  <th>类型</th>
+                  <th>金额 (USDC)</th>
+                  <th>来源</th>
+                </tr>
+              )}
+              {historyTab === 'orders' && (
+                <tr>
+                  <th>时间</th>
+                  <th>合约</th>
+                  <th>方向</th>
+                  <th>价格</th>
+                  <th>数量</th>
+                  <th>状态</th>
+                </tr>
+              )}
+            </thead>
+            <tbody>
+              {historyTab === 'trades' &&
+                (trades.length ? (
+                  trades.map((item) => (
+                    <tr key={`${item.hash}-${item.time_ms}`}>
+                      <td>{item.time_ms ? new Date(Number(item.time_ms)).toLocaleString() : '-'}</td>
+                      <td>{item.coin}</td>
+                      <td>{item.dir || item.side}</td>
+                      <td>{item.px}</td>
+                      <td>{item.sz}</td>
+                      <td className={Number(item.closed_pnl || 0) >= 0 ? 'text-success' : 'text-danger'}>
+                        {numberFormatter.format(Number(item.closed_pnl || 0))}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="muted">
+                      暂无交易记录
+                    </td>
+                  </tr>
+                ))}
+              {historyTab === 'ledger' &&
+                (ledgerItems.length ? (
+                  ledgerItems.map((item) => (
+                    <tr key={`${item.hash}-${item.time_ms}`}>
+                      <td>{item.time_ms ? new Date(Number(item.time_ms)).toLocaleString() : '-'}</td>
+                      <td>{item.delta_type}</td>
+                      <td>{numberFormatter.format(Number(item.usdc_value ?? item.amount ?? 0))}</td>
+                      <td>{item.vault || item.token || '-'}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={4} className="muted">
+                      暂无资金流水
+                    </td>
+                  </tr>
+                ))}
+              {historyTab === 'orders' &&
+                (orderItems.length ? (
+                  orderItems.map((item) => (
+                    <tr key={`${item.hash || item.oid}-${item.time_ms}`}>
+                      <td>{item.time_ms ? new Date(Number(item.time_ms)).toLocaleString() : '-'}</td>
+                      <td>{item.coin}</td>
+                      <td>{item.side}</td>
+                      <td>{item.limit_px ?? item.px}</td>
+                      <td>{item.sz}</td>
+                      <td>{item.status ?? item.order_type}</td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="muted">
+                      暂无订单记录
+                    </td>
+                  </tr>
+                ))}
             </tbody>
           </table>
         </div>
         <div className="pagination">
-          <button className="btn small" onClick={() => setTradePage((p) => Math.max(p - 1, 0))} disabled={tradePage === 0}>
-            上一页
-          </button>
-          <span>
-            第 {tradePage + 1} / {tradeTotalPages} 页
-          </span>
-          <button
-            className="btn small"
-            onClick={() => setTradePage((p) => (p + 1 < tradeTotalPages ? p + 1 : p))}
-            disabled={tradePage + 1 >= tradeTotalPages}
-          >
-            下一页
-          </button>
+          {historyTab === 'trades' && (
+            <>
+              <button className="btn small" onClick={() => setTradePage((p) => Math.max(p - 1, 0))} disabled={tradePage === 0}>
+                上一页
+              </button>
+              <span>
+                第 {tradePage + 1} / {tradeTotalPages} 页
+              </span>
+              <button
+                className="btn small"
+                onClick={() => setTradePage((p) => (p + 1 < tradeTotalPages ? p + 1 : p))}
+                disabled={tradePage + 1 >= tradeTotalPages}
+              >
+                下一页
+              </button>
+            </>
+          )}
+          {historyTab === 'ledger' && (
+            <>
+              <button className="btn small" onClick={() => setLedgerPage((p) => Math.max(p - 1, 0))} disabled={ledgerPage === 0}>
+                上一页
+              </button>
+              <span>
+                第 {ledgerPage + 1} / {ledgerTotalPages} 页
+              </span>
+              <button
+                className="btn small"
+                onClick={() => setLedgerPage((p) => (p + 1 < ledgerTotalPages ? p + 1 : p))}
+                disabled={ledgerPage + 1 >= ledgerTotalPages}
+              >
+                下一页
+              </button>
+            </>
+          )}
+          {historyTab === 'orders' && (
+            <>
+              <button className="btn small" onClick={() => setOrderPage((p) => Math.max(p - 1, 0))} disabled={orderPage === 0}>
+                上一页
+              </button>
+              <span>
+                第 {orderPage + 1} / {orderTotalPages} 页
+              </span>
+              <button
+                className="btn small"
+                onClick={() => setOrderPage((p) => (p + 1 < orderTotalPages ? p + 1 : p))}
+                disabled={orderPage + 1 >= orderTotalPages}
+              >
+                下一页
+              </button>
+            </>
+          )}
         </div>
       </section>
 

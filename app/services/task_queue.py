@@ -23,17 +23,19 @@ def get_queue() -> Queue:
     return Queue(PROCESSING_QUEUE, connection=redis, default_timeout=600)
 
 
-def enqueue_wallet_sync(address: str, end_time: int | None = None, scheduled_by: str = "manual") -> str:
-    log_id = processing.prepare_stage(address, "sync", payload={"end_time": end_time}, scheduled_by=scheduled_by)
+def enqueue_wallet_sync(address: str, end_time: int | None = None, scheduled_by: str = "manual", force: bool = False) -> str:
+    log_id = processing.prepare_stage(
+        address, "sync", payload={"end_time": end_time}, scheduled_by=scheduled_by, force=force
+    )
     q = get_queue()
     job: Job = q.enqueue(run_wallet_sync, address, end_time, log_id, scheduled_by)
     logger.info("Enqueued wallet sync", extra={"address": address, "job_id": job.id})
     return job.id
 
 
-def enqueue_wallet_score(address: str, scheduled_by: str = "pipeline") -> Optional[str]:
+def enqueue_wallet_score(address: str, scheduled_by: str = "pipeline", force: bool = False) -> Optional[str]:
     try:
-        log_id = processing.prepare_stage(address, "score", scheduled_by=scheduled_by)
+        log_id = processing.prepare_stage(address, "score", scheduled_by=scheduled_by, force=force)
     except ValueError:
         return None
     q = get_queue()
@@ -42,9 +44,9 @@ def enqueue_wallet_score(address: str, scheduled_by: str = "pipeline") -> Option
     return job.id
 
 
-def enqueue_wallet_ai(address: str, scheduled_by: str = "pipeline") -> Optional[str]:
+def enqueue_wallet_ai(address: str, scheduled_by: str = "pipeline", force: bool = False) -> Optional[str]:
     try:
-        log_id = processing.prepare_stage(address, "ai", scheduled_by=scheduled_by)
+        log_id = processing.prepare_stage(address, "ai", scheduled_by=scheduled_by, force=force)
     except ValueError:
         return None
     q = get_queue()
@@ -56,7 +58,9 @@ def enqueue_wallet_ai(address: str, scheduled_by: str = "pipeline") -> Optional[
 def run_wallet_sync(address: str, end_time: int | None = None, log_id: int | None = None, scheduled_by: str = "system") -> Dict[str, Any]:
     """Full data sync followed by automatic score enqueue."""
     if log_id is None:
-        log_id = processing.prepare_stage(address, "sync", payload={"end_time": end_time}, scheduled_by=scheduled_by)
+        log_id = processing.prepare_stage(
+            address, "sync", payload={"end_time": end_time}, scheduled_by=scheduled_by, force=True
+        )
     processing.mark_stage_running(log_id)
     task_id = tasks_service.log_task_start("wallet_sync", {"address": address, "end_time": end_time, "scheduled_by": scheduled_by})
     try:
@@ -85,7 +89,7 @@ def run_wallet_sync(address: str, end_time: int | None = None, log_id: int | Non
 
 def run_wallet_score(address: str, log_id: int | None = None, scheduled_by: str = "system") -> Dict[str, Any]:
     if log_id is None:
-        log_id = processing.prepare_stage(address, "score", scheduled_by=scheduled_by)
+        log_id = processing.prepare_stage(address, "score", scheduled_by=scheduled_by, force=True)
     processing.mark_stage_running(log_id)
     task_id = tasks_service.log_task_start("wallet_score", {"address": address, "scheduled_by": scheduled_by})
     try:
@@ -104,7 +108,7 @@ def run_wallet_score(address: str, log_id: int | None = None, scheduled_by: str 
 
 def run_wallet_ai(address: str, log_id: int | None = None, scheduled_by: str = "system") -> Dict[str, Any]:
     if log_id is None:
-        log_id = processing.prepare_stage(address, "ai", scheduled_by=scheduled_by)
+        log_id = processing.prepare_stage(address, "ai", scheduled_by=scheduled_by, force=True)
     processing.mark_stage_running(log_id)
     task_id = tasks_service.log_task_start("wallet_ai", {"address": address, "scheduled_by": scheduled_by})
     try:

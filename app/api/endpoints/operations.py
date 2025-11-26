@@ -110,7 +110,10 @@ def processing_summary():
     return ProcessingSummaryResponse(
         stages=[ProcessingStageStats(stage=item["stage"], counts=item["counts"]) for item in data["stages"]],
         pending_rescore=data["pending_rescore"],
+        pending_wallets=data["pending_wallets"],
         queue_size=queue_size,
+        batch_estimate_seconds=data["batch_estimate_seconds"],
+        scope=data["scope"],
         last_failed=[map_log(log) for log in data["failed_logs"]],
     )
 
@@ -196,13 +199,13 @@ def retry_processing(payload: ProcessingRetryRequest):
         raise HTTPException(status_code=400, detail="invalid stage")
     try:
         if stage == "sync":
-            job_id = task_queue.enqueue_wallet_sync(payload.address, scheduled_by="manual")
+            job_id = task_queue.enqueue_wallet_sync(payload.address, scheduled_by="manual", force=True)
         elif stage == "score":
-            job_id = task_queue.enqueue_wallet_score(payload.address, scheduled_by="manual")
+            job_id = task_queue.enqueue_wallet_score(payload.address, scheduled_by="manual", force=True)
             if job_id is None:
                 raise HTTPException(status_code=400, detail="score stage already pending or wallet不存在")
         else:
-            job_id = task_queue.enqueue_wallet_ai(payload.address, scheduled_by="manual")
+            job_id = task_queue.enqueue_wallet_ai(payload.address, scheduled_by="manual", force=True)
             if job_id is None:
                 raise HTTPException(status_code=400, detail="AI stage已在队列或钱包不存在")
     except ValueError as exc:

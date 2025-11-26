@@ -135,7 +135,9 @@ class WalletSummary(BaseModel):
     last_synced_at: Optional[str] = None
     last_score_at: Optional[str] = None
     last_ai_at: Optional[str] = None
+    next_sync_due: Optional[str] = None
     next_score_due: Optional[str] = None
+    next_ai_due: Optional[str] = None
     last_error: Optional[str] = None
     note: Optional[str] = None
     created_at: str

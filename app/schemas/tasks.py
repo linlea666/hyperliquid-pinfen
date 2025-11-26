@@ -52,8 +52,18 @@ class ProcessingStageStats(BaseModel):
     counts: Dict[str, int]
 
 
+class ProcessingScopeSummary(BaseModel):
+    type: str
+    recent_days: Optional[int] = None
+    tag: Optional[str] = None
+    description: str
+
+
 class ProcessingSummaryResponse(BaseModel):
     stages: List[ProcessingStageStats]
     pending_rescore: int
+    pending_wallets: int
     queue_size: int
+    batch_estimate_seconds: int
+    scope: ProcessingScopeSummary
     last_failed: List[ProcessingLogResponse]

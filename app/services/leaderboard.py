@@ -46,6 +46,27 @@ def update_leaderboard(lb_id: int, **kwargs) -> Leaderboard:
         return lb
 
 
+def _extract_periods(metric: WalletMetric) -> dict:
+    if not metric.details:
+        return {}
+    try:
+        details = json.loads(metric.details)
+        periods = details.get("periods", {})
+    except Exception:
+        return {}
+    keep_keys = ["1d", "7d", "30d", "90d", "1y", "all"]
+    payload = {}
+    for key in keep_keys:
+        if key in periods:
+            value = periods[key]
+            payload[key] = {
+                "pnl": str(value.get("pnl")) if value.get("pnl") is not None else None,
+                "return": value.get("return"),
+                "trades": value.get("trades"),
+            }
+    return payload
+
+
 def run_leaderboard(lb_id: int, limit: int = 20) -> List[LeaderboardResult]:
     with session_scope() as session:
         lb = session.get(Leaderboard, lb_id)
@@ -81,6 +102,7 @@ def run_leaderboard(lb_id: int, limit: int = 20) -> List[LeaderboardResult]:
                         "win_rate": str(metric.win_rate) if metric.win_rate is not None else None,
                         "total_pnl": str(metric.total_pnl) if metric.total_pnl is not None else None,
                         "avg_pnl": str(metric.avg_pnl) if metric.avg_pnl is not None else None,
+                        "periods": _extract_periods(metric),
                     }
                 ),
             )

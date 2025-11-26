@@ -11,6 +11,8 @@ import type {
   ScoringConfig,
   ProcessingConfigResponse,
   ProcessingConfig,
+  ProcessingBatchResponse,
+  ProcessingTemplate,
 } from '../types';
 
 type AdminTab = 'notifications' | 'schedules' | 'preferences' | 'processing' | 'scoring';
@@ -49,6 +51,8 @@ export default function AdminPanel() {
   const [scoringDraft, setScoringDraft] = useState<ScoringConfig | null>(null);
   const [triggerRescore, setTriggerRescore] = useState(false);
   const [processingDraft, setProcessingDraft] = useState<ProcessingConfig | null>(null);
+  const [activeProcessingTemplate, setActiveProcessingTemplate] = useState<string | null>(null);
+  const [runningBatch, setRunningBatch] = useState(false);
   const indicatorMeta: Record<string, string> = {
     total_pnl: '单位：USDC，统计周期内的累计收益额',
     avg_pnl: '单位：USDC/笔，单笔平均盈亏',
@@ -77,6 +81,7 @@ export default function AdminPanel() {
   useEffect(() => {
     if (processingConfigResp) {
       setProcessingDraft(JSON.parse(JSON.stringify(processingConfigResp.config)));
+      setActiveProcessingTemplate(processingConfigResp.active_template ?? null);
     }
   }, [processingConfigResp]);
 
@@ -111,6 +116,19 @@ export default function AdminPanel() {
     });
   };
 
+  const applyProcessingTemplate = (template: ProcessingTemplate) => {
+    if (!processingDraft) return;
+    updateProcessingDraft((draft) => {
+      Object.entries(template.overrides || {}).forEach(([key, value]) => {
+        if (value !== undefined && key in draft) {
+          (draft as Record<string, any>)[key] = value as any;
+        }
+      });
+    });
+    setActiveProcessingTemplate(template.key);
+    showToast(`已应用模板「${template.name}」`, 'success');
+  };
+
   const saveScoringConfig = async () => {
     if (!scoringDraft) return;
     await apiPost('/scoring/config', { config: scoringDraft, trigger_rescore: triggerRescore });
@@ -134,9 +152,32 @@ export default function AdminPanel() {
 
   const saveProcessingConfig = async () => {
     if (!processingDraft) return;
-    await apiPost('/processing/config', { config: processingDraft });
+    await apiPost('/processing/config', { config: processingDraft, active_template: activeProcessingTemplate });
     showToast('分析处理配置已保存', 'success');
     await refetchProcessingConfig();
+  };
+
+  const runProcessingBatch = async () => {
+    if (!processingDraft) return;
+    setRunningBatch(true);
+    try {
+      const payload: Record<string, any> = {
+        scope_type: processingDraft.scope_type,
+        force: false,
+      };
+      if (processingDraft.scope_type === 'recent') {
+        payload.recent_days = processingDraft.scope_recent_days;
+      }
+      if (processingDraft.scope_type === 'tag') {
+        payload.tag = processingDraft.scope_tag;
+      }
+      const res = await apiPost<ProcessingBatchResponse>('/processing/run_batch', payload);
+      showToast(`已投递 ${res.enqueued}/${res.requested} 个钱包`, 'success');
+    } catch (err: any) {
+      showToast(err?.message ?? '批处理启动失败', 'error');
+    } finally {
+      setRunningBatch(false);
+    }
   };
 
   const tabButtons = useMemo(
@@ -338,72 +379,182 @@ export default function AdminPanel() {
           <p className="muted">配置钱包同步、评分、AI 分析的并发与重试策略。</p>
           {!processingDraft && <p className="muted">加载中...</p>}
           {processingDraft && (
-            <div className="settings-grid">
-              <label>
-                同步并发数
-                <input
-                  type="number"
-                  value={processingDraft.max_parallel_sync}
-                  onChange={(e) => updateProcessingDraft((draft) => (draft.max_parallel_sync = Number(e.target.value)))}
-                />
-                <span className="muted">同时执行的钱包同步任务数</span>
-              </label>
-              <label>
-                评分并发数
-                <input
-                  type="number"
-                  value={processingDraft.max_parallel_score}
-                  onChange={(e) => updateProcessingDraft((draft) => (draft.max_parallel_score = Number(e.target.value)))}
-                />
-                <span className="muted">评分任务同时运行数量</span>
-              </label>
-              <label>
-                失败重试次数
-                <input
-                  type="number"
-                  value={processingDraft.retry_limit}
-                  onChange={(e) => updateProcessingDraft((draft) => (draft.retry_limit = Number(e.target.value)))}
-                />
-                <span className="muted">单阶段失败后最多尝试次数</span>
-              </label>
-              <label>
-                重试间隔 (秒)
-                <input
-                  type="number"
-                  value={processingDraft.retry_delay_seconds}
-                  onChange={(e) => updateProcessingDraft((draft) => (draft.retry_delay_seconds = Number(e.target.value)))}
-                />
-              </label>
-              <label>
-                评分刷新周期 (天)
-                <input
-                  type="number"
-                  value={processingDraft.rescore_period_days}
-                  onChange={(e) => updateProcessingDraft((draft) => (draft.rescore_period_days = Number(e.target.value)))}
-                />
-              </label>
-              <label>
-                触发重算阈值 (%)
-                <input
-                  type="number"
-                  value={processingDraft.rescore_trigger_pct}
-                  onChange={(e) => updateProcessingDraft((draft) => (draft.rescore_trigger_pct = Number(e.target.value)))}
-                />
-                <span className="muted">收益/回撤变动超过该比例时记入重算队列</span>
-              </label>
-              <label>
-                AI 分析周期 (天)
-                <input
-                  type="number"
-                  value={processingDraft.ai_period_days}
-                  onChange={(e) => updateProcessingDraft((draft) => (draft.ai_period_days = Number(e.target.value)))}
-                />
-              </label>
-            </div>
+            <>
+              {processingConfigResp?.templates?.length ? (
+                <div className="template-grid">
+                  {processingConfigResp.templates.map((tpl) => (
+                    <button
+                      type="button"
+                      key={tpl.key}
+                      className={`template-card ${activeProcessingTemplate === tpl.key ? 'active' : ''}`}
+                      onClick={() => applyProcessingTemplate(tpl)}
+                    >
+                      <div className="template-card-header">
+                        <strong>{tpl.name}</strong>
+                        {activeProcessingTemplate === tpl.key && <span className="badge">当前</span>}
+                      </div>
+                      <p className="muted">{tpl.description}</p>
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+              <div className="settings-grid">
+                <label>
+                  同步并发数
+                  <input
+                    type="number"
+                    value={processingDraft.max_parallel_sync}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.max_parallel_sync = Number(e.target.value)))}
+                  />
+                  <span className="muted">同时执行的钱包同步任务数</span>
+                </label>
+                <label>
+                  评分并发数
+                  <input
+                    type="number"
+                    value={processingDraft.max_parallel_score}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.max_parallel_score = Number(e.target.value)))}
+                  />
+                  <span className="muted">评分任务同时运行数量</span>
+                </label>
+                <label>
+                  失败重试次数
+                  <input
+                    type="number"
+                    value={processingDraft.retry_limit}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.retry_limit = Number(e.target.value)))}
+                  />
+                  <span className="muted">单阶段失败后最多尝试次数</span>
+                </label>
+                <label>
+                  重试间隔 (秒)
+                  <input
+                    type="number"
+                    value={processingDraft.retry_delay_seconds}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.retry_delay_seconds = Number(e.target.value)))}
+                  />
+                </label>
+                <label>
+                  评分刷新周期 (天)
+                  <input
+                    type="number"
+                    value={processingDraft.rescore_period_days}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.rescore_period_days = Number(e.target.value)))}
+                  />
+                </label>
+                <label>
+                  触发重算阈值 (%)
+                  <input
+                    type="number"
+                    value={processingDraft.rescore_trigger_pct}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.rescore_trigger_pct = Number(e.target.value)))}
+                  />
+                  <span className="muted">收益/回撤变动超过该比例时记入重算队列</span>
+                </label>
+                <label>
+                  AI 分析周期 (天)
+                  <input
+                    type="number"
+                    value={processingDraft.ai_period_days}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.ai_period_days = Number(e.target.value)))}
+                  />
+                </label>
+                <label>
+                  处理范围
+                  <select
+                    value={processingDraft.scope_type}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.scope_type = e.target.value))}
+                  >
+                    <option value="all">全部钱包</option>
+                    <option value="today">仅今日导入</option>
+                    <option value="recent">最近 N 天导入</option>
+                    <option value="tag">指定标签</option>
+                  </select>
+                  <span className="muted">决定批处理优先关注哪些钱包</span>
+                </label>
+                {processingDraft.scope_type === 'recent' && (
+                  <label>
+                    最近天数
+                    <input
+                      type="number"
+                      value={processingDraft.scope_recent_days}
+                      onChange={(e) => updateProcessingDraft((draft) => (draft.scope_recent_days = Number(e.target.value)))}
+                    />
+                  </label>
+                )}
+                {processingDraft.scope_type === 'tag' && (
+                  <label>
+                    标签关键字
+                    <input
+                      value={processingDraft.scope_tag || ''}
+                      onChange={(e) => updateProcessingDraft((draft) => (draft.scope_tag = e.target.value))}
+                    />
+                    <span className="muted">仅处理包含该标签的钱包</span>
+                  </label>
+                )}
+                <label>
+                  批次大小
+                  <input
+                    type="number"
+                    value={processingDraft.batch_size}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.batch_size = Number(e.target.value)))}
+                  />
+                  <span className="muted">每批最多入队钱包数量</span>
+                </label>
+                <label>
+                  批次间隔 (秒)
+                  <input
+                    type="number"
+                    value={processingDraft.batch_interval_seconds}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.batch_interval_seconds = Number(e.target.value)))}
+                  />
+                  <span className="muted">定时任务两批之间的等待时间</span>
+                </label>
+                <label>
+                  API 速率 (次/分钟)
+                  <input
+                    type="number"
+                    value={processingDraft.request_rate_per_min}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.request_rate_per_min = Number(e.target.value)))}
+                  />
+                  <span className="muted">用于限流，避免 Hyperliquid 返回 429</span>
+                </label>
+                <label>
+                  同步冷却 (天)
+                  <input
+                    type="number"
+                    value={processingDraft.sync_cooldown_days}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.sync_cooldown_days = Number(e.target.value)))}
+                  />
+                </label>
+                <label>
+                  评分冷却 (天)
+                  <input
+                    type="number"
+                    value={processingDraft.score_cooldown_days}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.score_cooldown_days = Number(e.target.value)))}
+                  />
+                </label>
+                <label>
+                  AI 冷却 (天)
+                  <input
+                    type="number"
+                    value={processingDraft.ai_cooldown_days}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.ai_cooldown_days = Number(e.target.value)))}
+                  />
+                </label>
+              </div>
+              <div className="header-actions">
+                <button className="btn primary" onClick={saveProcessingConfig} disabled={!processingDraft}>
+                  保存分析设置
+                </button>
+                <button className="btn secondary" onClick={runProcessingBatch} disabled={runningBatch}>
+                  {runningBatch ? '批量提交中...' : '按当前范围立即处理'}
+                </button>
+              </div>
+              <p className="muted">提示：批处理会按照上方的范围与批次配置，立即将一批钱包加入队列。</p>
+            </>
           )}
-          <button className="btn primary" onClick={saveProcessingConfig} disabled={!processingDraft}>
-            保存分析设置
-          </button>
         </section>
       )}
 

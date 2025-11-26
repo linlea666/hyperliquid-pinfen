@@ -29,6 +29,13 @@ export default function Leaderboards() {
     }
   }, [leaderboards, selected]);
 
+  const formatReturn = (entry: LeaderboardResultResponse['results'][number], key: string) => {
+    const value = entry.metrics?.periods?.[key]?.return;
+    if (value === undefined || value === null) return '--';
+    const num = Number(value);
+    return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
+  };
+
   if (isLoading) {
     return <div className="card">加载中...</div>;
   }
@@ -71,6 +78,8 @@ export default function Leaderboards() {
                 <p className="metric-title">#{entry.rank}</p>
                 <p className="metric-value">{entry.wallet_address}</p>
                 <p className="metric-desc">得分：{entry.score ?? '--'}</p>
+                <p className="metric-desc">7日收益率：{formatReturn(entry, '7d')}</p>
+                <p className="metric-desc">30日收益率：{formatReturn(entry, '30d')}</p>
               </div>
             ))}
           </div>
@@ -87,7 +96,9 @@ export default function Leaderboards() {
                   <th>排名</th>
                   <th>钱包</th>
                   <th>得分</th>
-                  <th>指标</th>
+                  <th>7日收益率</th>
+                  <th>30日收益率</th>
+                  <th>累计收益</th>
                 </tr>
               </thead>
               <tbody>
@@ -96,8 +107,12 @@ export default function Leaderboards() {
                     <td>{entry.rank}</td>
                     <td>{entry.wallet_address}</td>
                     <td>{entry.score ?? '--'}</td>
+                    <td>{formatReturn(entry, '7d')}</td>
+                    <td>{formatReturn(entry, '30d')}</td>
                     <td>
-                      {entry.metrics ? JSON.stringify(entry.metrics) : '—'}
+                      {entry.metrics?.periods?.all?.pnl
+                        ? Number(entry.metrics.periods.all.pnl).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                        : '--'}
                     </td>
                   </tr>
                 ))}

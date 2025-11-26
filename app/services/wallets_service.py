@@ -231,6 +231,7 @@ def list_wallets(
             "last_ai_at": wallet.last_ai_at.isoformat() if wallet.last_ai_at else None,
             "next_score_due": wallet.next_score_due.isoformat() if wallet.next_score_due else None,
             "last_error": wallet.last_error,
+            "note": wallet.note,
             "created_at": wallet.created_at.isoformat(),
             "metric": metric_dict,
             "metric_period": normalized_period if metric_dict else None,
@@ -281,6 +282,7 @@ def get_wallet_detail(address: str) -> Optional[dict]:
         "last_ai_at": wallet.last_ai_at.isoformat() if wallet.last_ai_at else None,
         "next_score_due": wallet.next_score_due.isoformat() if wallet.next_score_due else None,
         "last_error": wallet.last_error,
+        "note": wallet.note,
         "created_at": wallet.created_at.isoformat(),
     }
     metric_dict = _serialize_sa(metric)
@@ -359,3 +361,13 @@ def list_import_records(limit: int = 20, offset: int = 0):
             }
         )
     return {"total": total, "items": items}
+
+
+def update_wallet_note(address: str, note: Optional[str]) -> Optional[str]:
+    with session_scope() as session:
+        wallet = session.execute(select(Wallet).where(Wallet.address == address)).scalar_one_or_none()
+        if not wallet:
+            return None
+        wallet.note = note.strip() if note else None
+        session.add(wallet)
+        return wallet.note

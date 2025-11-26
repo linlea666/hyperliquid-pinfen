@@ -13,6 +13,7 @@ PROCESSING_COLUMNS = {
         "last_ai_at": "DATETIME",
         "next_score_due": "DATETIME",
         "last_error": "TEXT",
+        "note": "TEXT",
     },
     "wallet_metrics": {
         "details": "TEXT",

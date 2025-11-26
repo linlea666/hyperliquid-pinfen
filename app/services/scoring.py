@@ -37,6 +37,23 @@ def compute_metrics(user: str) -> Tuple[WalletMetric, WalletScore]:
         import time
         now_ms = int(time.time() * 1000)
 
+        period_windows = {
+            "1d": 86_400_000,
+            "7d": 7 * 86_400_000,
+            "30d": 30 * 86_400_000,
+            "90d": 90 * 86_400_000,
+            "1y": 365 * 86_400_000,
+            "all": None,
+        }
+        period_stats = {
+            key: {
+                "pnl": Decimal(0),
+                "volume": Decimal(0),
+                "trades": 0,
+            }
+            for key in period_windows
+        }
+
         total_pnl = Decimal(0)
         total_fees = Decimal(0)
         volume = Decimal(0)
@@ -66,6 +83,12 @@ def compute_metrics(user: str) -> Tuple[WalletMetric, WalletScore]:
             drawdown = peak - equity
             if drawdown > max_drawdown:
                 max_drawdown = drawdown
+            for key, window in period_windows.items():
+                if window is None or (now_ms - (f.time_ms or now_ms)) <= window:
+                    stats = period_stats[key]
+                    stats["pnl"] += pnl
+                    stats["volume"] += notional
+                    stats["trades"] += 1
 
         win_rate = Decimal(wins) / Decimal(trades) if trades else Decimal(0)
         avg_pnl = total_pnl / Decimal(trades) if trades else Decimal(0)
@@ -86,6 +109,21 @@ def compute_metrics(user: str) -> Tuple[WalletMetric, WalletScore]:
         details["capital_efficiency"] = max(
             0.0, min(1.0, float((abs(total_pnl) + Decimal(1)) / (volume + Decimal(1))))
         )
+        period_results = {}
+        for key, stats in period_stats.items():
+            pnl_value = stats["pnl"]
+            vol_value = stats["volume"]
+            pnl_float = float(pnl_value)
+            if vol_value:
+                ratio = float(pnl_value / vol_value) * 100
+            else:
+                ratio = pnl_float * 100
+            period_results[key] = {
+                "pnl": pnl_float,
+                "return": ratio,
+                "trades": stats["trades"],
+            }
+        details["periods"] = period_results
 
         metric = WalletMetric(
             user=user,

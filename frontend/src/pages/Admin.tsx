@@ -443,48 +443,61 @@ export default function AdminPanel() {
                     <p className="muted">{dimensionHints[dim.key] ?? ''}</p>
                     <p className="muted">指标范围 / 权重</p>
                     {dim.indicators.map((indicator, indIdx) => (
-                      <div key={`${indicator.field}-${indIdx}`} className="indicator-grid">
-                        <span>{indicator.field}</span>
-                        <input
-                          type="number"
-                          value={indicator.min}
-                          onChange={(e) =>
-                            updateScoringDraft((next) => {
-                              next.dimensions[idx].indicators[indIdx].min = Number(e.target.value);
-                            })
-                          }
-                        />
-                        <input
-                          type="number"
-                          value={indicator.max}
-                          onChange={(e) =>
-                            updateScoringDraft((next) => {
-                              next.dimensions[idx].indicators[indIdx].max = Number(e.target.value);
-                            })
-                          }
-                        />
-                        <label className="checkbox-row">
-                          <input
-                            type="checkbox"
-                            checked={indicator.higher_is_better}
-                            onChange={(e) =>
-                              updateScoringDraft((next) => {
-                                next.dimensions[idx].indicators[indIdx].higher_is_better = e.target.checked;
-                              })
-                            }
-                          />
-                          越高越好
-                        </label>
-                        <input
-                          type="number"
-                          value={indicator.weight}
-                          onChange={(e) =>
-                            updateScoringDraft((next) => {
-                              next.dimensions[idx].indicators[indIdx].weight = Number(e.target.value);
-                            })
-                          }
-                        />
-                        <span className="indicator-hint">{indicatorMeta[indicator.field] ?? ''}</span>
+                      <div key={`${indicator.field}-${indIdx}`} className="indicator-row">
+                        <div className="indicator-meta">
+                          <strong>{indicator.field}</strong>
+                          <span>{indicatorMeta[indicator.field] ?? ''}</span>
+                        </div>
+                        <div className="indicator-fields">
+                          <label>
+                            最小值
+                            <input
+                              type="number"
+                              value={indicator.min}
+                              onChange={(e) =>
+                                updateScoringDraft((next) => {
+                                  next.dimensions[idx].indicators[indIdx].min = Number(e.target.value);
+                                })
+                              }
+                            />
+                          </label>
+                          <label>
+                            最大值
+                            <input
+                              type="number"
+                              value={indicator.max}
+                              onChange={(e) =>
+                                updateScoringDraft((next) => {
+                                  next.dimensions[idx].indicators[indIdx].max = Number(e.target.value);
+                                })
+                              }
+                            />
+                          </label>
+                          <label className="checkbox-row inline">
+                            <input
+                              type="checkbox"
+                              checked={indicator.higher_is_better}
+                              onChange={(e) =>
+                                updateScoringDraft((next) => {
+                                  next.dimensions[idx].indicators[indIdx].higher_is_better = e.target.checked;
+                                })
+                              }
+                            />
+                            越高越好
+                          </label>
+                          <label>
+                            权重
+                            <input
+                              type="number"
+                              value={indicator.weight}
+                              onChange={(e) =>
+                                updateScoringDraft((next) => {
+                                  next.dimensions[idx].indicators[indIdx].weight = Number(e.target.value);
+                                })
+                              }
+                            />
+                          </label>
+                        </div>
                       </div>
                     ))}
                   </div>

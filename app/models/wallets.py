@@ -23,5 +23,6 @@ class Wallet(Base):
     last_ai_at = Column(DateTime)
     next_score_due = Column(DateTime)
     last_error = Column(Text)
+    note = Column(Text)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

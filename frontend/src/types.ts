@@ -1,3 +1,22 @@
+export interface WalletPeriodStat {
+  pnl: number;
+  return: number;
+  trades: number;
+}
+
+export interface WalletMetricDetails {
+  total_pnl?: number;
+  total_fees?: number;
+  avg_pnl?: number;
+  win_rate?: number;
+  max_drawdown?: number;
+  volume?: number;
+  trades?: number;
+  equity_stability?: number;
+  capital_efficiency?: number;
+  periods?: Record<string, WalletPeriodStat>;
+}
+
 export interface WalletMetric {
   trades?: number;
   wins?: number;
@@ -10,6 +29,7 @@ export interface WalletMetric {
   avg_pnl?: string;
   as_of?: number;
   updated_at?: string;
+  details?: WalletMetricDetails;
 }
 
 export interface TagSummary {
@@ -33,6 +53,7 @@ export interface WalletSummary {
   last_ai_at?: string;
   next_score_due?: string;
   last_error?: string;
+  note?: string | null;
   created_at: string;
   metric?: WalletMetric;
   metric_period?: string;
@@ -45,6 +66,11 @@ export interface WalletSummary {
 export interface WalletListResponse {
   total: number;
   items: WalletSummary[];
+}
+
+export interface WalletNoteResponse {
+  address: string;
+  note?: string | null;
 }
 
 export interface WalletOverview {

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiGet } from '../api/client';
@@ -26,6 +26,16 @@ export default function WalletList() {
   const [sortField, setSortField] = useState('win_rate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [copied, setCopied] = useState('');
+  const currencyFormatter = useMemo(
+    () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }),
+    []
+  );
+  const formatPercent = (value?: string) => {
+    if (!value) return '--';
+    const num = Number(value);
+    if (Number.isNaN(num)) return '--';
+    return `${(num * 100).toFixed(1)}%`;
+  };
   const navigate = useNavigate();
 
   const { data, isFetching, error } = useQuery<WalletListResponse>({
@@ -125,6 +135,7 @@ export default function WalletList() {
                 <th>状态</th>
                 <th>同步阶段</th>
                 <th>标签</th>
+                <th>备注</th>
                 <th>胜率</th>
                 <th>累计盈亏</th>
                 <th>平均盈亏</th>
@@ -167,9 +178,14 @@ export default function WalletList() {
                       <span className="muted">-</span>
                     )}
                   </td>
-                  <td>{wallet.metric?.win_rate ?? '--'}</td>
-                  <td>{wallet.metric?.total_pnl ?? '--'}</td>
-                  <td>{wallet.metric?.avg_pnl ?? '--'}</td>
+                  <td>{wallet.note || <span className="muted">-</span>}</td>
+                  <td>{formatPercent(wallet.metric?.win_rate as string)}</td>
+                  <td>
+                    {wallet.metric?.total_pnl ? currencyFormatter.format(Number(wallet.metric.total_pnl)) : '--'}
+                  </td>
+                  <td>
+                    {wallet.metric?.avg_pnl ? currencyFormatter.format(Number(wallet.metric.avg_pnl)) : '--'}
+                  </td>
                   <td>
                     <button className="btn small" onClick={() => navigate(`/wallets/${wallet.address}`)}>
                       查看
@@ -179,7 +195,7 @@ export default function WalletList() {
               ))}
               {!wallets.length && (
                 <tr>
-                  <td colSpan={8} className="muted">
+                  <td colSpan={9} className="muted">
                     暂无数据，先去
                     <button className="btn small" style={{ marginLeft: '0.5rem' }} onClick={() => navigate('/wallets/import')}>
                       批量导入

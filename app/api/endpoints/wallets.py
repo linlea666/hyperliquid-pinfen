@@ -16,6 +16,8 @@ from app.schemas.wallets import (
     WalletSummary,
     WalletDetailResponse,
     WalletImportHistoryResponse,
+    WalletNoteRequest,
+    WalletNoteResponse,
 )
 from app.services.wallet_importer import import_wallets
 from app.services import query as query_service
@@ -126,6 +128,14 @@ def wallet_detail(address: str) -> WalletDetailResponse:
     if not data:
         raise HTTPException(status_code=404, detail="wallet not found")
     return WalletDetailResponse(**data)
+
+
+@router.post("/wallets/{address}/note", response_model=WalletNoteResponse, dependencies=[Depends(get_current_user)])
+def wallet_update_note(address: str, payload: WalletNoteRequest) -> WalletNoteResponse:
+    note = wallets_service.update_wallet_note(address, payload.note)
+    if note is None and payload.note is not None:
+        raise HTTPException(status_code=404, detail="wallet not found")
+    return WalletNoteResponse(address=address, note=note)
 
 
 @router.get("/wallets/ledger", summary="分页查询账本事件")

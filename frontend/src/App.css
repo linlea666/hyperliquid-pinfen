@@ -279,6 +279,9 @@
   align-items: center;
   gap: 0.5rem;
 }
+.checkbox-row.inline {
+  flex-direction: row;
+}
 
 .indicator-grid {
   display: grid;
@@ -291,6 +294,69 @@
 .indicator-hint {
   font-size: 0.8rem;
   color: #94a3b8;
+}
+
+.note-editor {
+  width: 100%;
+  min-height: 120px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: inherit;
+  padding: 0.75rem;
+  margin-top: 0.75rem;
+}
+
+.period-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 1rem;
+  margin-top: 1rem;
+}
+
+.period-summary .metric-value {
+  font-size: 1.6rem;
+}
+
+.text-success {
+  color: #4ade80;
+}
+
+.text-danger {
+  color: #f87171;
+}
+
+.indicator-row {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 0.75rem;
+  margin-bottom: 0.75rem;
+  background: rgba(255, 255, 255, 0.01);
+}
+
+.indicator-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin-bottom: 0.5rem;
+}
+
+.indicator-meta span {
+  color: #94a3b8;
+  font-size: 0.85rem;
+}
+
+.indicator-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 0.75rem;
+}
+
+.indicator-fields label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  font-size: 0.85rem;
 }
 
 .login-page {

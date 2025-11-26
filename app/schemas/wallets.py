@@ -137,6 +137,7 @@ class WalletSummary(BaseModel):
     last_ai_at: Optional[str] = None
     next_score_due: Optional[str] = None
     last_error: Optional[str] = None
+     note: Optional[str] = None
     created_at: str
     metric: Optional[dict] = None
     metric_period: Optional[str] = None
@@ -149,3 +150,12 @@ class WalletListResponse(BaseModel):
 
 class WalletDetailResponse(WalletSummary):
     score: Optional[dict] = None
+
+
+class WalletNoteRequest(BaseModel):
+    note: Optional[str] = Field(None, max_length=500)
+
+
+class WalletNoteResponse(BaseModel):
+    address: str
+    note: Optional[str] = None

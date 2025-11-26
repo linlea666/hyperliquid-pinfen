@@ -216,6 +216,18 @@ export interface ProcessingLogListResponse {
   items: ProcessingLog[];
 }
 
+export interface ProcessingStageStats {
+  stage: string;
+  counts: Record<string, number>;
+}
+
+export interface ProcessingSummaryResponse {
+  stages: ProcessingStageStats[];
+  pending_rescore: number;
+  queue_size: number;
+  last_failed: ProcessingLog[];
+}
+
 export interface ScoringIndicatorConfig {
   field: string;
   min: number;

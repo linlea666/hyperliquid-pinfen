@@ -144,8 +144,23 @@ def list_wallets(
             "max_drawdown": metric_view.c.metric_max_drawdown,
         }
 
+        metric_columns = [
+            metric_view.c.metric_user,
+            metric_view.c.metric_win_rate,
+            metric_view.c.metric_total_pnl,
+            metric_view.c.metric_avg_pnl,
+            metric_view.c.metric_volume,
+            metric_view.c.metric_trades,
+            metric_view.c.metric_max_drawdown,
+            metric_view.c.metric_wins,
+            metric_view.c.metric_losses,
+            metric_view.c.metric_as_of,
+            metric_view.c.metric_created_at,
+            metric_view.c.metric_details,
+        ]
+
         data_query = (
-            select(Wallet, metric_view)
+            select(Wallet, *metric_columns)
             .outerjoin(metric_view, Wallet.address == metric_view.c.metric_user)
             .offset(offset)
             .limit(limit)
@@ -165,17 +180,11 @@ def list_wallets(
 
         total = session.execute(count_query).scalar_one()
         rows = session.execute(data_query).all()
-        wallets: List[Wallet] = []
-        metric_rows: Dict[str, Any] = {}
-        for row in rows:
-            wallet_obj = row[0]
-            metric_obj = row[1] if len(row) > 1 else None
-            wallets.append(wallet_obj)
-            metric_rows[wallet_obj.address] = metric_obj
-        addresses = [wallet.address for wallet in wallets]
+        addresses = [row[0].address for row in rows]
         tags_map = _tags_map(session, addresses)
 
-    def serialize(wallet: Wallet) -> dict:
+    def serialize(row) -> dict:
+        wallet: Wallet = row[0]
         raw_tags = tags_map.get(wallet.address) or (json.loads(wallet.tags) if wallet.tags else [])
         tags = []
         for tag in raw_tags:
@@ -183,28 +192,30 @@ def list_wallets(
                 tags.append(tag)
             else:
                 tags.append({"name": tag})
-        metric_row = metric_rows.get(wallet.address)
+        metric_row = row._mapping
+        metric_user = metric_row.get("metric_user")
         metric_dict = None
-        if metric_row and metric_row.metric_user:
+        if metric_user:
             metric_dict = {
-                "win_rate": str(metric_row.metric_win_rate) if metric_row.metric_win_rate is not None else None,
-                "total_pnl": str(metric_row.metric_total_pnl) if metric_row.metric_total_pnl is not None else None,
-                "avg_pnl": str(metric_row.metric_avg_pnl) if metric_row.metric_avg_pnl is not None else None,
-                "volume": str(metric_row.metric_volume) if metric_row.metric_volume is not None else None,
-                "trades": int(metric_row.metric_trades) if metric_row.metric_trades is not None else None,
-                "max_drawdown": str(metric_row.metric_max_drawdown)
-                if metric_row.metric_max_drawdown is not None
+                "win_rate": str(metric_row["metric_win_rate"]) if metric_row.get("metric_win_rate") is not None else None,
+                "total_pnl": str(metric_row["metric_total_pnl"]) if metric_row.get("metric_total_pnl") is not None else None,
+                "avg_pnl": str(metric_row["metric_avg_pnl"]) if metric_row.get("metric_avg_pnl") is not None else None,
+                "volume": str(metric_row["metric_volume"]) if metric_row.get("metric_volume") is not None else None,
+                "trades": int(metric_row["metric_trades"]) if metric_row.get("metric_trades") is not None else None,
+                "max_drawdown": str(metric_row["metric_max_drawdown"])
+                if metric_row.get("metric_max_drawdown") is not None
                 else None,
-                "wins": int(metric_row.metric_wins) if metric_row.metric_wins is not None else None,
-                "losses": int(metric_row.metric_losses) if metric_row.metric_losses is not None else None,
-                "as_of": int(metric_row.metric_as_of) if metric_row.metric_as_of is not None else None,
-                "updated_at": metric_row.metric_created_at.isoformat()
-                if metric_row.metric_created_at is not None
+                "wins": int(metric_row["metric_wins"]) if metric_row.get("metric_wins") is not None else None,
+                "losses": int(metric_row["metric_losses"]) if metric_row.get("metric_losses") is not None else None,
+                "as_of": int(metric_row["metric_as_of"]) if metric_row.get("metric_as_of") is not None else None,
+                "updated_at": metric_row["metric_created_at"].isoformat()
+                if metric_row.get("metric_created_at") is not None
                 else None,
             }
-            if getattr(metric_row, "metric_details", None):
+            details = metric_row.get("metric_details")
+            if details:
                 try:
-                    metric_dict["details"] = json.loads(metric_row.metric_details)
+                    metric_dict["details"] = json.loads(details)
                 except Exception:
                     metric_dict["details"] = None
         return {
@@ -225,7 +236,7 @@ def list_wallets(
             "metric_period": normalized_period if metric_dict else None,
         }
 
-    return {"total": total, "items": [serialize(row) for row in wallets]}
+    return {"total": total, "items": [serialize(row) for row in rows]}
 
 
 def get_wallet_detail(address: str) -> Optional[dict]:

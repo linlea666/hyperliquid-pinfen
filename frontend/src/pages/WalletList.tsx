@@ -123,6 +123,7 @@ export default function WalletList() {
               <tr>
                 <th>地址</th>
                 <th>状态</th>
+                <th>同步阶段</th>
                 <th>标签</th>
                 <th>胜率</th>
                 <th>累计盈亏</th>
@@ -143,6 +144,13 @@ export default function WalletList() {
                   </td>
                   <td>
                     <span className={`status ${wallet.status}`}>{wallet.status}</span>
+                  </td>
+                  <td>
+                    <div className="status-stack">
+                      <span className={`status ${wallet.sync_status}`}>同步:{wallet.sync_status}</span>
+                      <span className={`status ${wallet.score_status}`}>评分:{wallet.score_status}</span>
+                      <span className={`status ${wallet.ai_status}`}>AI:{wallet.ai_status}</span>
+                    </div>
                   </td>
                   <td>
                     {wallet.tags.length > 0 ? (
@@ -171,8 +179,12 @@ export default function WalletList() {
               ))}
               {!wallets.length && (
                 <tr>
-                  <td colSpan={7} className="muted">
-                    暂无数据
+                  <td colSpan={8} className="muted">
+                    暂无数据，先去
+                    <button className="btn small" style={{ marginLeft: '0.5rem' }} onClick={() => navigate('/wallets/import')}>
+                      批量导入
+                    </button>
+                    或调整筛选条件。
                   </td>
                 </tr>
               )}

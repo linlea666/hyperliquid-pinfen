@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiGet, apiPost } from '../api/client';
 import type { WalletImportHistoryResponse, WalletImportResponse } from '../types';
+import { showToast } from '../utils/toast';
 
 function parseAddresses(text: string): string[] {
   return text
@@ -13,6 +14,7 @@ function parseAddresses(text: string): string[] {
 
 export default function WalletImport() {
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
   const [rawInput, setRawInput] = useState('');
   const [tags, setTags] = useState('');
   const [dryRun, setDryRun] = useState(true);
@@ -51,8 +53,13 @@ export default function WalletImport() {
       const res = await apiPost<WalletImportResponse>('/wallets/import', payload);
       setResult(res);
       await refetchHistory();
+      if (!res.dry_run) {
+        queryClient.invalidateQueries({ queryKey: ['wallets'] });
+      }
+      showToast(res.dry_run ? '试运行已完成' : '导入任务已提交，系统将自动同步', 'success');
     } catch (err: any) {
       setError(err.message || '导入失败');
+      showToast('导入失败，请检查输入', 'error');
     } finally {
       setLoading(false);
     }

@@ -20,6 +20,8 @@ from app.schemas.tasks import (
     ProcessingLogResponse,
     ProcessingRetryRequest,
     ProcessingRetryResponse,
+    ProcessingSummaryResponse,
+    ProcessingStageStats,
 )
 from app.schemas.schedule import ScheduleCreate, ScheduleResponse
 from app.services import notifications as notification_service
@@ -80,6 +82,36 @@ def list_processing_logs(
             )
             for log in logs
         ]
+    )
+
+
+@router.get("/processing/summary", response_model=ProcessingSummaryResponse, dependencies=[Depends(get_current_user)])
+def processing_summary():
+    data = processing_service.summary()
+    queue = task_queue.get_queue()
+    queue_size = queue.count
+
+    def map_log(log):
+        return ProcessingLogResponse(
+            id=log.id,
+            wallet_address=log.wallet_address,
+            stage=log.stage,
+            status=log.status,
+            attempt=log.attempt,
+            scheduled_by=log.scheduled_by,
+            payload=log.payload,
+            result=log.result,
+            error=log.error,
+            started_at=log.started_at.isoformat() if log.started_at else None,
+            finished_at=log.finished_at.isoformat() if log.finished_at else None,
+            created_at=log.created_at.isoformat(),
+        )
+
+    return ProcessingSummaryResponse(
+        stages=[ProcessingStageStats(stage=item["stage"], counts=item["counts"]) for item in data["stages"]],
+        pending_rescore=data["pending_rescore"],
+        queue_size=queue_size,
+        last_failed=[map_log(log) for log in data["failed_logs"]],
     )
 
 

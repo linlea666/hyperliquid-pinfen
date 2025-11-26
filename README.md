@@ -21,6 +21,7 @@ npm run dev
 默认 `.env.development` 使用 `VITE_API_BASE_URL=http://localhost:8000/api`，上线后请根据绑定的域名修改该变量（避免在代码中写死地址）。
 
 > **前端部署注意**：生产环境使用 Nginx/宝塔时，请在站点配置添加 `try_files $uri $uri/ /index.html;`，否则刷新路由（如 `/wallets/xxx`）会被 Nginx 误判为 404。
+> 详细部署示例见 [docs/deploy.md](docs/deploy.md)。
 
 ### 管理后台登录
 - 默认账号：`admin@example.com`，密码：`admin888`（首次启动自动创建，务必尽快在后台用户管理里修改）。

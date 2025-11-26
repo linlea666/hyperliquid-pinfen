@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel
 
@@ -45,3 +45,15 @@ class ProcessingRetryRequest(BaseModel):
 class ProcessingRetryResponse(BaseModel):
     stage: str
     job_id: Optional[str] = None
+
+
+class ProcessingStageStats(BaseModel):
+    stage: str
+    counts: Dict[str, int]
+
+
+class ProcessingSummaryResponse(BaseModel):
+    stages: List[ProcessingStageStats]
+    pending_rescore: int
+    queue_size: int
+    last_failed: List[ProcessingLogResponse]

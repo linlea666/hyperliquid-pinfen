@@ -169,3 +169,39 @@ def get_wallet_snapshot(address: str) -> Optional[dict]:
         "next_score_due": wallet.next_score_due.isoformat() if wallet.next_score_due else None,
         "last_error": wallet.last_error,
     }
+
+
+def summary(failed_limit: int = 5) -> dict:
+    """Aggregate stage counts & recent failures for operations dashboard."""
+    with session_scope() as session:
+        stage_stats = []
+        for stage, meta in STAGE_META.items():
+            field = getattr(Wallet, meta["status_field"])
+            rows = session.execute(select(field, func.count()).group_by(field)).all()
+            counts: dict[str, int] = {}
+            for status_value, count in rows:
+                key = status_value or "unknown"
+                counts[key] = count
+            stage_stats.append({"stage": stage, "counts": counts})
+
+        pending_rescore = session.execute(
+            select(func.count())
+            .select_from(Wallet)
+            .where(Wallet.next_score_due.is_not(None), Wallet.next_score_due <= datetime.utcnow())
+        ).scalar_one()
+
+        failed_logs = (
+            session.execute(
+                select(WalletProcessingLog)
+                .where(WalletProcessingLog.status == "failed")
+                .order_by(desc(WalletProcessingLog.created_at))
+                .limit(failed_limit)
+            )
+            .scalars()
+            .all()
+        )
+    return {
+        "stages": stage_stats,
+        "pending_rescore": pending_rescore,
+        "failed_logs": failed_logs,
+    }

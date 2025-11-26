@@ -9,6 +9,7 @@ from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 from app.core.database import session_scope
 from app.models import FetchCursor, Fill, LedgerEvent, PositionSnapshot, OrderHistory, PortfolioSeries
 from app.services.hyperliquid_client import HyperliquidClient
+from app.services import local_cache
 
 logger = logging.getLogger(__name__)
 
@@ -42,11 +43,14 @@ def sync_ledger(user: str, end_time: Optional[int] = None) -> int:
     """Fetch and store ledger updates; returns number of new rows."""
     with session_scope() as session, HyperliquidClient() as client:
         start_time = _get_cursor(session, user, "ledger") + 1
+        initial_only = start_time <= 1
         new_rows = 0
+        last_time_written: Optional[int] = None
         while True:
             batch = client.user_non_funding_ledger_updates(user=user, start_time=start_time, end_time=end_time)
             if not batch:
                 break
+            local_cache.append_events(user, "ledger", batch)
             for item in batch:
                 delta = item.get("delta", {})
                 stmt = sqlite_insert(LedgerEvent).values(
@@ -72,11 +76,17 @@ def sync_ledger(user: str, end_time: Optional[int] = None) -> int:
                 result = session.execute(stmt)
                 if result.rowcount:
                     new_rows += 1
-                start_time = max(start_time, item["time"] + 1)
+                event_time = item["time"]
+                start_time = max(start_time, event_time + 1)
+                last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
             if len(batch) < 500:  # reached end
                 break
+            if initial_only:
+                break
         if new_rows:
-            _upsert_cursor(session, user, "ledger", start_time - 1)
+            cursor_value = last_time_written if last_time_written is not None else (start_time - 1)
+            _upsert_cursor(session, user, "ledger", cursor_value)
+            local_cache.update_metadata(user, last_ledger_time_ms=cursor_value)
         return new_rows
 
 
@@ -84,11 +94,14 @@ def sync_fills(user: str, end_time: Optional[int] = None) -> int:
     """Fetch fills with time pagination; returns number of new rows."""
     with session_scope() as session, HyperliquidClient() as client:
         start_time = _get_cursor(session, user, "fills") + 1
+        initial_only = start_time <= 1
         new_rows = 0
+        last_time_written: Optional[int] = None
         while True:
             batch = client.user_fills(user=user, start_time=start_time, end_time=end_time)
             if not batch:
                 break
+            local_cache.append_events(user, "fills", batch)
             for item in batch:
                 stmt = sqlite_insert(Fill).values(
                     user=user,
@@ -112,11 +125,17 @@ def sync_fills(user: str, end_time: Optional[int] = None) -> int:
                 result = session.execute(stmt)
                 if result.rowcount:
                     new_rows += 1
-                start_time = max(start_time, item["time"] + 1)
+                event_time = item["time"]
+                start_time = max(start_time, event_time + 1)
+                last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
             if len(batch) < 2000:
                 break
+            if initial_only:
+                break
         if new_rows:
-            _upsert_cursor(session, user, "fills", start_time - 1)
+            cursor_value = last_time_written if last_time_written is not None else (start_time - 1)
+            _upsert_cursor(session, user, "fills", cursor_value)
+            local_cache.update_metadata(user, last_fill_time_ms=cursor_value)
         return new_rows
 
 

@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost } from '../api/client';
+import { showToast } from '../utils/toast';
 import type {
   Schedule,
   TemplateResponse,
@@ -70,6 +71,7 @@ export default function AdminPanel() {
     if (!email || !prefs) return;
     await apiPost(`/admin/preferences?email=${encodeURIComponent(email)}`, prefs);
     setMessage('用户偏好已保存');
+    showToast('用户偏好已保存', 'success');
   };
 
   const updateScoringDraft = (updater: (draft: ScoringConfig) => void) => {
@@ -93,7 +95,9 @@ export default function AdminPanel() {
   const saveScoringConfig = async () => {
     if (!scoringDraft) return;
     await apiPost('/scoring/config', { config: scoringDraft, trigger_rescore: triggerRescore });
-    setMessage(triggerRescore ? '评分配置已保存并触发重算' : '评分配置已保存');
+    const msg = triggerRescore ? '评分配置已保存并触发重算' : '评分配置已保存';
+    setMessage(msg);
+    showToast(msg, 'success');
     setTriggerRescore(false);
     await refetchScoringConfig();
   };
@@ -102,6 +106,7 @@ export default function AdminPanel() {
     if (!processingDraft) return;
     await apiPost('/processing/config', { config: processingDraft });
     setMessage('分析处理配置已保存');
+    showToast('分析处理配置已保存', 'success');
     await refetchProcessingConfig();
   };
 

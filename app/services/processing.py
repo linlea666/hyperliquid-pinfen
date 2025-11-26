@@ -6,7 +6,7 @@ from sqlalchemy import desc, func, select
 
 from app.core.database import session_scope
 from app.models import Wallet, WalletProcessingLog
-from app.services import admin as admin_service
+from app.services import processing_config
 
 STAGE_META = {
     "sync": {"status_field": "sync_status", "success_value": "synced", "time_field": "last_synced_at"},
@@ -22,12 +22,8 @@ def _get_stage_meta(stage: str) -> dict:
 
 
 def _rescore_period_days() -> int:
-    value = admin_service.get_config("processing.rescore_period_days")
-    try:
-        days = int(value) if value is not None else 7
-    except ValueError:
-        days = 7
-    return max(1, days)
+    cfg = processing_config.get_processing_config()
+    return max(1, int(cfg.get("rescore_period_days", 7)))
 
 
 def prepare_stage(address: str, stage: str, payload: Optional[dict] = None, scheduled_by: str = "system") -> int:

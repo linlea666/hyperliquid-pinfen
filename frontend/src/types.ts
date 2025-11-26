@@ -241,3 +241,17 @@ export interface ScoringConfig {
 export interface ScoringConfigResponse {
   config: ScoringConfig;
 }
+
+export interface ProcessingConfig {
+  max_parallel_sync: number;
+  max_parallel_score: number;
+  retry_limit: number;
+  retry_delay_seconds: number;
+  rescore_period_days: number;
+  rescore_trigger_pct: number;
+  ai_period_days: number;
+}
+
+export interface ProcessingConfigResponse {
+  config: ProcessingConfig;
+}

@@ -8,6 +8,8 @@ import type {
   PreferenceResponse,
   ScoringConfigResponse,
   ScoringConfig,
+  ProcessingConfigResponse,
+  ProcessingConfig,
 } from '../types';
 
 export default function AdminPanel() {
@@ -37,14 +39,25 @@ export default function AdminPanel() {
     queryKey: ['scoring-config'],
     queryFn: () => apiGet<ScoringConfigResponse>('/scoring/config'),
   });
+  const { data: processingConfigResp, refetch: refetchProcessingConfig } = useQuery<ProcessingConfigResponse>({
+    queryKey: ['processing-config'],
+    queryFn: () => apiGet<ProcessingConfigResponse>('/processing/config'),
+  });
   const [scoringDraft, setScoringDraft] = useState<ScoringConfig | null>(null);
   const [triggerRescore, setTriggerRescore] = useState(false);
+  const [processingDraft, setProcessingDraft] = useState<ProcessingConfig | null>(null);
 
   useEffect(() => {
     if (scoringConfigResp) {
       setScoringDraft(JSON.parse(JSON.stringify(scoringConfigResp.config)));
     }
   }, [scoringConfigResp]);
+
+  useEffect(() => {
+    if (processingConfigResp) {
+      setProcessingDraft(JSON.parse(JSON.stringify(processingConfigResp.config)));
+    }
+  }, [processingConfigResp]);
 
   const loadPrefs = async () => {
     if (!email) return;
@@ -68,12 +81,28 @@ export default function AdminPanel() {
     });
   };
 
+  const updateProcessingDraft = (updater: (draft: ProcessingConfig) => void) => {
+    setProcessingDraft((prev) => {
+      if (!prev) return prev;
+      const next = { ...prev };
+      updater(next);
+      return next;
+    });
+  };
+
   const saveScoringConfig = async () => {
     if (!scoringDraft) return;
     await apiPost('/scoring/config', { config: scoringDraft, trigger_rescore: triggerRescore });
     setMessage(triggerRescore ? '评分配置已保存并触发重算' : '评分配置已保存');
     setTriggerRescore(false);
     await refetchScoringConfig();
+  };
+
+  const saveProcessingConfig = async () => {
+    if (!processingDraft) return;
+    await apiPost('/processing/config', { config: processingDraft });
+    setMessage('分析处理配置已保存');
+    await refetchProcessingConfig();
   };
 
   return (
@@ -227,6 +256,78 @@ export default function AdminPanel() {
         )}
         <button className="btn primary" onClick={savePrefs} disabled={!prefs}>
           保存偏好
+        </button>
+      </section>
+
+      <section className="card">
+        <h3>分析处理设置</h3>
+        {!processingDraft && <p className="muted">加载中...</p>}
+        {processingDraft && (
+          <div className="settings-grid">
+            <label>
+              同步并发数
+              <input
+                type="number"
+                value={processingDraft.max_parallel_sync}
+                onChange={(e) => updateProcessingDraft((draft) => (draft.max_parallel_sync = Number(e.target.value)))}
+              />
+              <span className="muted">同时执行的钱包同步任务数</span>
+            </label>
+            <label>
+              评分并发数
+              <input
+                type="number"
+                value={processingDraft.max_parallel_score}
+                onChange={(e) => updateProcessingDraft((draft) => (draft.max_parallel_score = Number(e.target.value)))}
+              />
+              <span className="muted">评分任务同时运行数量</span>
+            </label>
+            <label>
+              失败重试次数
+              <input
+                type="number"
+                value={processingDraft.retry_limit}
+                onChange={(e) => updateProcessingDraft((draft) => (draft.retry_limit = Number(e.target.value)))}
+              />
+              <span className="muted">单阶段失败后最多尝试次数</span>
+            </label>
+            <label>
+              重试间隔 (秒)
+              <input
+                type="number"
+                value={processingDraft.retry_delay_seconds}
+                onChange={(e) => updateProcessingDraft((draft) => (draft.retry_delay_seconds = Number(e.target.value)))}
+              />
+            </label>
+            <label>
+              评分刷新周期 (天)
+              <input
+                type="number"
+                value={processingDraft.rescore_period_days}
+                onChange={(e) => updateProcessingDraft((draft) => (draft.rescore_period_days = Number(e.target.value)))}
+              />
+            </label>
+            <label>
+              触发重算阈值 (%)
+              <input
+                type="number"
+                value={processingDraft.rescore_trigger_pct}
+                onChange={(e) => updateProcessingDraft((draft) => (draft.rescore_trigger_pct = Number(e.target.value)))}
+              />
+              <span className="muted">收益/回撤变动超过该比例时记入重算队列</span>
+            </label>
+            <label>
+              AI 分析周期 (天)
+              <input
+                type="number"
+                value={processingDraft.ai_period_days}
+                onChange={(e) => updateProcessingDraft((draft) => (draft.ai_period_days = Number(e.target.value)))}
+              />
+            </label>
+          </div>
+        )}
+        <button className="btn primary" onClick={saveProcessingConfig} disabled={!processingDraft}>
+          保存分析设置
         </button>
       </section>
 

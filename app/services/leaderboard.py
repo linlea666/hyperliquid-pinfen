@@ -86,7 +86,6 @@ def run_leaderboard(lb_id: int, limit: int = 20) -> List[LeaderboardResult]:
             raise ValueError("Leaderboard not found")
         effective_limit = lb.result_limit or limit or 20
         sort_key = lb.sort_key or "total_pnl"
-        order_column = sort_column.desc() if (lb.sort_order or "desc").lower() == "desc" else sort_column.asc()
         previous_top = (
             session.execute(
                 select(LeaderboardResult)

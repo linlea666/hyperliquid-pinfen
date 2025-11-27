@@ -7,7 +7,7 @@ from app.core.logging import setup_logging
 from app.core.database import Base, engine
 import app.models  # noqa: F401
 from app.services.scheduler import start_scheduler, stop_scheduler
-from app.services.bootstrap import ensure_default_admin, ensure_processing_schema
+from app.services.bootstrap import ensure_default_admin, ensure_processing_schema, ensure_default_leaderboards
 
 
 def create_app() -> FastAPI:
@@ -36,6 +36,7 @@ def create_app() -> FastAPI:
         Base.metadata.create_all(bind=engine)
         ensure_processing_schema()
         ensure_default_admin()
+        ensure_default_leaderboards()
         start_scheduler()
 
     @app.on_event("shutdown")

@@ -2,12 +2,13 @@ import json
 import logging
 from datetime import datetime
 from decimal import Decimal
-from typing import List, Optional
+from typing import Any, List, Optional
 
-from sqlalchemy import Select, desc, select
+from sqlalchemy import Select, and_, desc, select
+from sqlalchemy.orm import aliased
 
 from app.core.database import session_scope
-from app.models import Leaderboard, LeaderboardResult, WalletMetric
+from app.models import Leaderboard, LeaderboardResult, WalletMetric, PortfolioSnapshot
 from app.services import notifications as notification_service
 from app.services import admin as admin_service
 
@@ -73,7 +74,6 @@ def run_leaderboard(lb_id: int, limit: int = 20) -> List[LeaderboardResult]:
         if not lb:
             raise ValueError("Leaderboard not found")
         sort_key = lb.sort_key or "total_pnl"
-        sort_column = getattr(WalletMetric, sort_key, WalletMetric.total_pnl)
         order_column = sort_column.desc() if (lb.sort_order or "desc").lower() == "desc" else sort_column.asc()
         previous_top = (
             session.execute(
@@ -83,7 +83,92 @@ def run_leaderboard(lb_id: int, limit: int = 20) -> List[LeaderboardResult]:
             .scalars()
             .first()
         )
-        metrics_stmt = select(WalletMetric).order_by(order_column).limit(limit)
+        metrics_stmt = select(WalletMetric)
+
+        portfolio_aliases: dict[str, any] = {}
+        joins: list[tuple[Any, Any]] = []
+
+        def ensure_portfolio_alias(period: str):
+            if period in portfolio_aliases:
+                return portfolio_aliases[period]
+            alias = aliased(PortfolioSnapshot, name=f"lb_portfolio_{period}")
+            joins.append((alias, and_(alias.user == WalletMetric.user, alias.period == period)))
+            portfolio_aliases[period] = alias
+            return alias
+
+        def resolve_column(source: str, field: str, period: Optional[str] = None):
+            if source == "metric":
+                return getattr(WalletMetric, field, None)
+            if source == "portfolio":
+                alias = ensure_portfolio_alias(period or "month")
+                mapping = {
+                    "return_pct": alias.return_pct,
+                    "max_drawdown_pct": alias.max_drawdown_pct,
+                    "volume": alias.volume,
+                }
+                return mapping.get(field)
+            return None
+
+        def parse_sort_column(key: str):
+            if key.startswith("portfolio_"):
+                parts = key.split("_")
+                if len(parts) >= 3:
+                    period = parts[1]
+                    metric_name = parts[2]
+                    field_map = {
+                        "return": "return_pct",
+                        "drawdown": "max_drawdown_pct",
+                    }
+                    column = resolve_column("portfolio", field_map.get(metric_name, metric_name), period)
+                    if column is not None:
+                        return column
+            return getattr(WalletMetric, key, None)
+
+        sort_column = parse_sort_column(sort_key) or WalletMetric.total_pnl
+        order_column = sort_column.desc() if (lb.sort_order or "desc").lower() == "desc" else sort_column.asc()
+
+        filter_defs = []
+        if lb.filters:
+            try:
+                filter_defs = json.loads(lb.filters)
+            except Exception:
+                filter_defs = []
+
+        filter_exprs = []
+        op_map = {
+            ">=" : lambda col, val: col >= val,
+            ">" : lambda col, val: col > val,
+            "<=" : lambda col, val: col <= val,
+            "<" : lambda col, val: col < val,
+            "==" : lambda col, val: col == val,
+        }
+        for filt in filter_defs:
+            source = filt.get("source", "metric")
+            field = filt.get("field")
+            if not field:
+                continue
+            period = filt.get("period")
+            column = resolve_column(source, field, period)
+            if column is None:
+                continue
+            op = filt.get("op", ">=")
+            comparator = op_map.get(op)
+            if not comparator:
+                continue
+            value = filt.get("value")
+            if value is None:
+                continue
+            try:
+                value_decimal = Decimal(str(value))
+            except Exception:
+                value_decimal = value
+            filter_exprs.append(comparator(column, value_decimal))
+
+        for alias, condition in joins:
+            metrics_stmt = metrics_stmt.outerjoin(alias, condition)
+        if filter_exprs:
+            metrics_stmt = metrics_stmt.where(and_(*filter_exprs))
+        metrics_stmt = metrics_stmt.order_by(order_column).limit(limit)
         metrics = session.execute(metrics_stmt).scalars().all()
         session.query(LeaderboardResult).filter(LeaderboardResult.leaderboard_id == lb_id).delete()
         results = []

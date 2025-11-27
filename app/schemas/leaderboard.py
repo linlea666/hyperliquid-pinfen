@@ -1,4 +1,4 @@
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from pydantic import BaseModel, Field
 
@@ -11,7 +11,7 @@ class LeaderboardCreate(BaseModel):
     style: str = "table"
     accent_color: str = "#7c3aed"
     badge: Optional[str] = None
-    filters: Optional[dict] = None
+    filters: Optional[List[dict]] = None
     sort_key: str = "total_pnl"
     sort_order: str = "desc"
     period: str = "all"
@@ -29,7 +29,7 @@ class LeaderboardResponse(BaseModel):
     style: str
     accent_color: str
     badge: Optional[str]
-    filters: Optional[dict]
+    filters: Optional[List[dict]]
     sort_key: str
     sort_order: str
     period: str

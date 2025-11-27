@@ -2,7 +2,7 @@ from app.models.ledger import LedgerEvent, FetchCursor
 from app.models.fills import Fill
 from app.models.positions import PositionSnapshot
 from app.models.orders import OrderHistory
-from app.models.portfolio import PortfolioSeries
+from app.models.portfolio import PortfolioSeries, PortfolioSnapshot
 from app.models.scores import WalletMetric, WalletScore
 from app.models.wallets import Wallet
 from app.models.auth import User, Role, Permission, AuditLog, SystemConfig, UserPreference
@@ -26,6 +26,7 @@ __all__ = [
     "PositionSnapshot",
     "OrderHistory",
     "PortfolioSeries",
+    "PortfolioSnapshot",
     "WalletMetric",
     "WalletScore",
     "Wallet",

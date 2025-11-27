@@ -36,6 +36,20 @@ export default function Leaderboards() {
     return `${num >= 0 ? '+' : ''}${num.toFixed(2)}%`;
   };
 
+  const formatWinRate = (val?: number | string) => {
+    if (val === undefined || val === null) return '--';
+    const num = Number(val);
+    if (Number.isNaN(num)) return '--';
+    return `${(num * 100).toFixed(1)}%`;
+  };
+
+  const formatCurrency = (value?: number | string) => {
+    if (value === undefined || value === null) return '--';
+    const num = Number(value);
+    if (Number.isNaN(num)) return '--';
+    return num >= 1000 ? num.toLocaleString(undefined, { maximumFractionDigits: 0 }) : num.toFixed(2);
+  };
+
   if (isLoading) {
     return <div className="card">加载中...</div>;
   }
@@ -69,56 +83,80 @@ export default function Leaderboards() {
         </div>
       </section>
 
-      {selected && detail && detail.leaderboard.style === 'card' && (
+      {selected && detail && (
         <section className="card">
-          <h3>{detail.leaderboard.name} - 当前结果</h3>
-          <div className="leaderboard-cards-grid">
-            {detail.results.map((entry) => (
-              <div key={entry.wallet_address} className="metric-card" style={{ borderColor: detail.leaderboard.accent_color }}>
-                <p className="metric-title">#{entry.rank}</p>
-                <p className="metric-value">{entry.wallet_address}</p>
-                <p className="metric-desc">得分：{entry.score ?? '--'}</p>
-                <p className="metric-desc">7日收益率：{formatReturn(entry, '7d')}</p>
-                <p className="metric-desc">30日收益率：{formatReturn(entry, '30d')}</p>
-              </div>
-            ))}
+          <div className="leaderboard-detail-header">
+            <div>
+              <h3>
+                {detail.leaderboard.icon && <span className="emoji">{detail.leaderboard.icon}</span>}
+                {detail.leaderboard.name}
+              </h3>
+              <p className="muted">{detail.leaderboard.description || '暂无描述'}</p>
+              <p className="muted">
+                排序：{detail.leaderboard.sort_key}（{detail.leaderboard.sort_order}） ｜ 周期：{detail.leaderboard.period}
+              </p>
+            </div>
+            <div className="leaderboard-meta">
+              <p>展示数量：{detail.results.length}</p>
+              <p>风格：{detail.leaderboard.style === 'card' ? '卡片' : '表格'}</p>
+            </div>
           </div>
-        </section>
-      )}
-
-      {selected && detail && detail.leaderboard.style !== 'card' && (
-        <section className="card">
-          <h3>{detail.leaderboard.name} - 当前结果</h3>
-          <div className="table-wrapper">
-            <table>
-              <thead>
-                <tr>
-                  <th>排名</th>
-                  <th>钱包</th>
-                  <th>得分</th>
-                  <th>7日收益率</th>
-                  <th>30日收益率</th>
-                  <th>累计收益</th>
-                </tr>
-              </thead>
-              <tbody>
-                {detail.results.map((entry) => (
-                  <tr key={entry.wallet_address}>
-                    <td>{entry.rank}</td>
-                    <td>{entry.wallet_address}</td>
-                    <td>{entry.score ?? '--'}</td>
-                    <td>{formatReturn(entry, '7d')}</td>
-                    <td>{formatReturn(entry, '30d')}</td>
-                    <td>
-                      {entry.metrics?.periods?.all?.pnl
-                        ? Number(entry.metrics.periods.all.pnl).toLocaleString(undefined, { maximumFractionDigits: 2 })
-                        : '--'}
-                    </td>
+          {Array.isArray(detail.leaderboard.filters) && detail.leaderboard.filters.length > 0 && (
+            <div className="filter-badges">
+              {detail.leaderboard.filters.map((f: any, idx: number) => (
+                <span key={idx} className="badge">
+                  {(f.source === 'portfolio' ? `官方-${f.period || 'month'}` : '指标') + ' ' + (f.field || '')} {f.op || '>='} {f.value}
+                </span>
+              ))}
+            </div>
+          )}
+          {detail.leaderboard.style === 'card' ? (
+            <div className="leaderboard-cards-grid">
+              {detail.results.map((entry) => (
+                <div key={entry.wallet_address} className="metric-card" style={{ borderColor: detail.leaderboard.accent_color }}>
+                  <p className="metric-title">#{entry.rank}</p>
+                  <p className="metric-value">{entry.wallet_address}</p>
+                  <p className="metric-desc">胜率：{formatWinRate(entry.metrics?.win_rate)}</p>
+                  <p className="metric-desc">总盈亏：{formatCurrency(entry.metrics?.total_pnl)}</p>
+                  <p className="metric-desc">7日收益率：{formatReturn(entry, '7d')}</p>
+                  <p className="metric-desc">30日收益率：{formatReturn(entry, '30d')}</p>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="table-wrapper">
+              <table>
+                <thead>
+                  <tr>
+                    <th>排名</th>
+                    <th>钱包</th>
+                    <th>胜率</th>
+                    <th>总盈亏</th>
+                    <th>7日收益率</th>
+                    <th>30日收益率</th>
+                    <th>累计收益</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                </thead>
+                <tbody>
+                  {detail.results.map((entry) => (
+                    <tr key={entry.wallet_address}>
+                      <td>{entry.rank}</td>
+                      <td>{entry.wallet_address}</td>
+                      <td>{formatWinRate(entry.metrics?.win_rate)}</td>
+                      <td>{formatCurrency(entry.metrics?.total_pnl)}</td>
+                      <td>{formatReturn(entry, '7d')}</td>
+                      <td>{formatReturn(entry, '30d')}</td>
+                      <td>
+                        {entry.metrics?.periods?.all?.pnl
+                          ? Number(entry.metrics.periods.all.pnl).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                          : '--'}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
         </section>
       )}
     </div>

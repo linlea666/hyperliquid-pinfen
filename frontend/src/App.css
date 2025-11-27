@@ -504,6 +504,24 @@
   gap: 1rem;
 }
 
+.leaderboard-detail-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.leaderboard-meta {
+  text-align: right;
+  color: #9ea8cf;
+}
+
+.filter-badges {
+  margin-top: 0.75rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+
 .emoji {
   margin-right: 0.3rem;
 }

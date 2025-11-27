@@ -123,6 +123,48 @@ LEADERBOARD_PRESETS = [
         "sort_order": "asc",
         "period": "month",
     },
+    {
+        "name": "小亏大赚榜",
+        "description": "亏损可控、盈亏比优秀",
+        "icon": "⚖️",
+        "style": "table",
+        "accent_color": "#f472b6",
+        "filters": [
+            {"source": "metric", "field": "avg_pnl", "op": ">=", "value": 100},
+            {"source": "metric", "field": "max_drawdown", "op": "<=", "value": 5000},
+        ],
+        "sort_key": "avg_pnl",
+        "sort_order": "desc",
+        "period": "month",
+    },
+    {
+        "name": "高胜率榜",
+        "description": "胜率领先、稳定输出",
+        "icon": "🎯",
+        "style": "table",
+        "accent_color": "#22d3ee",
+        "filters": [
+            {"source": "metric", "field": "trades", "op": ">=", "value": 20},
+            {"source": "metric", "field": "win_rate", "op": ">=", "value": 0.65},
+        ],
+        "sort_key": "win_rate",
+        "sort_order": "desc",
+        "period": "month",
+    },
+    {
+        "name": "小资金高手榜",
+        "description": "资金规模不大但收益亮眼",
+        "icon": "💡",
+        "style": "card",
+        "accent_color": "#fb7185",
+        "filters": [
+            {"source": "metric", "field": "volume", "op": "<=", "value": 200000},
+            {"source": "portfolio", "period": "month", "field": "return_pct", "op": ">=", "value": 0.12},
+        ],
+        "sort_key": "portfolio_month_return",
+        "sort_order": "desc",
+        "period": "month",
+    },
 ]
 
 

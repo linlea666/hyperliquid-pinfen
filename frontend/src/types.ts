@@ -117,11 +117,13 @@ export interface LeaderboardResponse {
   style: string;
   accent_color: string;
   badge?: string;
-  filters?: Record<string, any>;
+  filters?: any[];
   sort_key: string;
   sort_order: string;
   period: string;
   is_public: boolean;
+  result_limit: number;
+  auto_refresh_minutes: number;
 }
 
 export interface LeaderboardResultEntry {

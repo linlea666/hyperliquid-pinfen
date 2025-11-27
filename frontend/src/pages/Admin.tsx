@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiGet, apiPost } from '../api/client';
+import { apiGet, apiPost, apiPut } from '../api/client';
 import { showToast } from '../utils/toast';
 import type {
   Schedule,
@@ -13,9 +13,35 @@ import type {
   ProcessingConfig,
   ProcessingBatchResponse,
   ProcessingTemplate,
+  LeaderboardResponse,
 } from '../types';
 
-type AdminTab = 'notifications' | 'schedules' | 'preferences' | 'processing' | 'scoring';
+type AdminTab = 'notifications' | 'schedules' | 'preferences' | 'processing' | 'scoring' | 'leaderboards';
+
+interface LeaderboardDraft
+  extends Omit<LeaderboardResponse, 'id' | 'filters'> {
+  id?: number;
+  filters: any[];
+  filtersText: string;
+}
+
+const defaultLeaderboardDraft: LeaderboardDraft = {
+  name: '',
+  type: 'custom',
+  description: '',
+  icon: '',
+  style: 'table',
+  accent_color: '#7c3aed',
+  badge: '',
+  filters: [],
+  filtersText: '[]',
+  sort_key: 'total_pnl',
+  sort_order: 'desc',
+  period: 'month',
+  is_public: true,
+  result_limit: 20,
+  auto_refresh_minutes: 0,
+};
 
 export default function AdminPanel() {
   const [email, setEmail] = useState('');
@@ -53,6 +79,12 @@ export default function AdminPanel() {
   const [processingDraft, setProcessingDraft] = useState<ProcessingConfig | null>(null);
   const [activeProcessingTemplate, setActiveProcessingTemplate] = useState<string | null>(null);
   const [runningBatch, setRunningBatch] = useState(false);
+  const { data: adminLeaderboards, refetch: refetchAdminLeaderboards } = useQuery<LeaderboardResponse[]>({
+    queryKey: ['admin-leaderboards'],
+    queryFn: () => apiGet<LeaderboardResponse[]>('/leaderboards'),
+  });
+  const [leaderboardDraft, setLeaderboardDraft] = useState<LeaderboardDraft | null>(null);
+  const [savingLeaderboard, setSavingLeaderboard] = useState(false);
   const indicatorMeta: Record<string, string> = {
     total_pnl: '单位：USDC，统计周期内的累计收益额',
     avg_pnl: '单位：USDC/笔，单笔平均盈亏',
@@ -90,6 +122,17 @@ export default function AdminPanel() {
       setActiveProcessingTemplate(processingConfigResp.active_template ?? null);
     }
   }, [processingConfigResp]);
+
+  useEffect(() => {
+    if (!adminLeaderboards || adminLeaderboards.length === 0) return;
+    if (leaderboardDraft && leaderboardDraft.id) return;
+    const first = adminLeaderboards[0];
+    setLeaderboardDraft({
+      ...first,
+      filters: Array.isArray(first.filters) ? first.filters : [],
+      filtersText: JSON.stringify(first.filters ?? [], null, 2),
+    });
+  }, [adminLeaderboards]);
 
   const loadPrefs = async () => {
     if (!email) return;
@@ -186,6 +229,81 @@ export default function AdminPanel() {
     }
   };
 
+  const beginEditLeaderboard = (lb?: LeaderboardResponse) => {
+    if (!lb) {
+      setLeaderboardDraft({ ...defaultLeaderboardDraft });
+      return;
+    }
+    setLeaderboardDraft({
+      ...lb,
+      filters: Array.isArray(lb.filters) ? lb.filters : [],
+      filtersText: JSON.stringify(lb.filters ?? [], null, 2),
+    });
+  };
+
+  const saveLeaderboard = async () => {
+    if (!leaderboardDraft) return;
+    let parsedFilters: any[] = [];
+    if (leaderboardDraft.filtersText.trim()) {
+      try {
+        const parsed = JSON.parse(leaderboardDraft.filtersText);
+        if (!Array.isArray(parsed)) {
+          throw new Error('过滤规则必须是数组');
+        }
+        parsedFilters = parsed;
+      } catch (err: any) {
+        showToast(err?.message ?? '过滤规则必须是合法 JSON 数组', 'error');
+        return;
+      }
+    }
+    const payload = {
+      name: leaderboardDraft.name,
+      type: leaderboardDraft.type,
+      description: leaderboardDraft.description,
+      icon: leaderboardDraft.icon,
+      style: leaderboardDraft.style,
+      accent_color: leaderboardDraft.accent_color,
+      badge: leaderboardDraft.badge,
+      filters: parsedFilters,
+      sort_key: leaderboardDraft.sort_key,
+      sort_order: leaderboardDraft.sort_order,
+      period: leaderboardDraft.period,
+      is_public: leaderboardDraft.is_public,
+      result_limit: leaderboardDraft.result_limit,
+      auto_refresh_minutes: leaderboardDraft.auto_refresh_minutes,
+    };
+    setSavingLeaderboard(true);
+    try {
+      let resp: LeaderboardResponse;
+      if (leaderboardDraft.id) {
+        resp = await apiPut<LeaderboardResponse>(`/leaderboards/${leaderboardDraft.id}`, payload);
+        showToast('榜单已更新', 'success');
+      } else {
+        resp = await apiPost<LeaderboardResponse>('/leaderboards', payload);
+        showToast('榜单已创建', 'success');
+      }
+      setLeaderboardDraft({
+        ...resp,
+        filters: Array.isArray(resp.filters) ? resp.filters : [],
+        filtersText: JSON.stringify(resp.filters ?? [], null, 2),
+      });
+      await refetchAdminLeaderboards();
+    } catch (err: any) {
+      showToast(err?.message ?? '保存榜单失败', 'error');
+    } finally {
+      setSavingLeaderboard(false);
+    }
+  };
+
+  const runLeaderboard = async (id: number) => {
+    try {
+      await apiPost(`/leaderboards/${id}/run`);
+      showToast('榜单已刷新', 'success');
+    } catch (err: any) {
+      showToast(err?.message ?? '刷新失败', 'error');
+    }
+  };
+
   const tabButtons = useMemo(
     () => [
       { key: 'notifications', label: '通知配置' },
@@ -193,6 +311,7 @@ export default function AdminPanel() {
       { key: 'preferences', label: '用户偏好' },
       { key: 'processing', label: '分析处理设置' },
       { key: 'scoring', label: '评分配置' },
+      { key: 'leaderboards', label: '榜单配置' },
     ],
     []
   );
@@ -702,6 +821,161 @@ export default function AdminPanel() {
               </button>
             </>
           )}
+        </section>
+      )}
+
+      {activeTab === 'leaderboards' && (
+        <section className="card">
+          <h3>榜单配置</h3>
+          <p className="muted">可调整榜单的排序、规则、展示数量及自动刷新频率。</p>
+          <div className="leaderboard-admin">
+            <div className="leaderboard-admin-list">
+              <button className="btn secondary small" onClick={() => beginEditLeaderboard(undefined)}>
+                + 新建榜单
+              </button>
+              <div className="scrollable">
+                {adminLeaderboards?.map((lb) => (
+                  <div
+                    key={lb.id}
+                    className={`scope-card leaderboard-item ${leaderboardDraft?.id === lb.id ? 'active' : ''}`}
+                    style={{ borderColor: leaderboardDraft?.id === lb.id ? lb.accent_color : 'rgba(255,255,255,0.05)' }}
+                  >
+                    <div className="leaderboard-item-header">
+                      <div>
+                        <strong>{lb.name}</strong>
+                        <p className="muted">{lb.description || '暂无描述'}</p>
+                      </div>
+                      <span className="badge" style={{ background: lb.accent_color }}>
+                        {lb.result_limit} 个
+                      </span>
+                    </div>
+                    <p className="muted">排序：{lb.sort_key}（{lb.sort_order}）</p>
+                    <p className="muted">自动刷新：{lb.auto_refresh_minutes ? `${lb.auto_refresh_minutes} 分钟` : '关闭'}</p>
+                    <div className="button-row">
+                      <button className="btn small" onClick={() => beginEditLeaderboard(lb)}>
+                        编辑
+                      </button>
+                      <button className="btn small secondary" onClick={() => runLeaderboard(lb.id)}>
+                        手动刷新
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="leaderboard-editor">
+              {leaderboardDraft ? (
+                <>
+                  <div className="form-grid">
+                    <div className="form-field">
+                      <label>榜单名称</label>
+                      <input value={leaderboardDraft.name} onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, name: e.target.value } : prev))} />
+                    </div>
+                    <div className="form-field">
+                      <label>类型</label>
+                      <select value={leaderboardDraft.type} onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, type: e.target.value } : prev))}>
+                        <option value="custom">自定义</option>
+                        <option value="preset">预设</option>
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>风格</label>
+                      <select value={leaderboardDraft.style} onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, style: e.target.value } : prev))}>
+                        <option value="table">表格</option>
+                        <option value="card">卡片</option>
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>图标/表情</label>
+                      <input value={leaderboardDraft.icon ?? ''} onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, icon: e.target.value } : prev))} />
+                    </div>
+                    <div className="form-field">
+                      <label>强调色</label>
+                      <input type="color" value={leaderboardDraft.accent_color} onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, accent_color: e.target.value } : prev))} />
+                    </div>
+                    <div className="form-field">
+                      <label>排序字段</label>
+                      <input value={leaderboardDraft.sort_key} onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, sort_key: e.target.value } : prev))} />
+                    </div>
+                    <div className="form-field">
+                      <label>排序方向</label>
+                      <select value={leaderboardDraft.sort_order} onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, sort_order: e.target.value } : prev))}>
+                        <option value="desc">降序</option>
+                        <option value="asc">升序</option>
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>周期</label>
+                      <select value={leaderboardDraft.period} onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, period: e.target.value } : prev))}>
+                        <option value="day">日</option>
+                        <option value="week">周</option>
+                        <option value="month">月</option>
+                        <option value="all">全部</option>
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>展示数量</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={200}
+                        value={leaderboardDraft.result_limit}
+                        onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, result_limit: Number(e.target.value) } : prev))}
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label>自动刷新（分钟）</label>
+                      <input
+                        type="number"
+                        min={0}
+                        value={leaderboardDraft.auto_refresh_minutes}
+                        onChange={(e) =>
+                          setLeaderboardDraft((prev) => (prev ? { ...prev, auto_refresh_minutes: Number(e.target.value) } : prev))
+                        }
+                      />
+                    </div>
+                    <div className="form-field">
+                      <label>公开展示</label>
+                      <div className="checkbox-row inline">
+                        <input
+                          type="checkbox"
+                          checked={leaderboardDraft.is_public}
+                          onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, is_public: e.target.checked } : prev))}
+                        />
+                        <span className="muted">对前台可见</span>
+                      </div>
+                    </div>
+                  </div>
+                  <div className="form-field">
+                    <label>描述</label>
+                    <textarea
+                      className="note-editor"
+                      value={leaderboardDraft.description ?? ''}
+                      onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, description: e.target.value } : prev))}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>过滤规则（JSON 数组）</label>
+                    <textarea
+                      className="json-input"
+                      value={leaderboardDraft.filtersText}
+                      onChange={(e) => setLeaderboardDraft((prev) => (prev ? { ...prev, filtersText: e.target.value } : prev))}
+                    />
+                    <p className="indicator-hint">
+                      示例：{`[{"source":"metric","field":"win_rate","op":">=","value":0.6}]`}
+                    </p>
+                  </div>
+                  <div className="button-row">
+                    <button className="btn primary" onClick={saveLeaderboard} disabled={savingLeaderboard}>
+                      {savingLeaderboard ? '保存中...' : '保存榜单'}
+                    </button>
+                  </div>
+                </>
+              ) : (
+                <p className="muted">请选择左侧榜单或点击“新建榜单”。</p>
+              )}
+            </div>
+          </div>
         </section>
       )}
     </div>

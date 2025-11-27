@@ -41,6 +41,18 @@ export async function apiPost<T>(path: string, body?: Record<string, any>): Prom
   return res.json();
 }
 
+export async function apiPut<T>(path: string, body?: Record<string, any>): Promise<T> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json', ...authHeaders() },
+    body: body ? JSON.stringify(body) : undefined,
+  });
+  if (!res.ok) {
+    throw new Error(`请求失败：${res.statusText}`);
+  }
+  return res.json();
+}
+
 export async function apiPostPublic<T>(path: string, body?: Record<string, any>): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',

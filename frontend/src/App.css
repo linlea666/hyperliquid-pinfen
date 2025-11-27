@@ -398,6 +398,91 @@
   background: rgba(255, 255, 255, 0.01);
 }
 
+.leaderboard-admin {
+  display: grid;
+  grid-template-columns: minmax(260px, 320px) 1fr;
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+@media (max-width: 960px) {
+  .leaderboard-admin {
+    grid-template-columns: 1fr;
+  }
+}
+
+.leaderboard-admin-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.leaderboard-admin-list .scrollable {
+  max-height: 420px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  padding-right: 0.25rem;
+}
+
+.leaderboard-item.active {
+  border-color: rgba(124, 58, 237, 0.8);
+}
+
+.leaderboard-item-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.4rem;
+}
+
+.leaderboard-editor {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 18px;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+}
+
+.form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 1rem;
+}
+
+.form-field label {
+  display: block;
+  font-size: 0.85rem;
+  color: #9ea8cf;
+  margin-bottom: 0.35rem;
+}
+
+.form-field input,
+.form-field select,
+.form-field textarea,
+.leaderboard-editor .note-editor {
+  width: 100%;
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+  padding: 0.55rem 0.75rem;
+}
+
+.json-input {
+  font-family: 'JetBrains Mono', monospace;
+  min-height: 160px;
+  resize: vertical;
+}
+
+.button-row {
+  display: flex;
+  gap: 0.75rem;
+  margin-top: 1rem;
+  flex-wrap: wrap;
+}
+
 .indicator-meta {
   display: flex;
   flex-direction: column;

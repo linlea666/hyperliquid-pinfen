@@ -1,10 +1,12 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { useNavigate } from 'react-router-dom';
 import { apiGet } from '../api/client';
 import type { LeaderboardResponse, LeaderboardResultResponse } from '../types';
 
 export default function Leaderboards() {
   const [selected, setSelected] = useState<number | null>(null);
+  const navigate = useNavigate();
   const preferences = useMemo(() => {
     if (typeof window === 'undefined') return null;
     const raw = window.localStorage.getItem('userPreferences');
@@ -99,6 +101,9 @@ export default function Leaderboards() {
             <div className="leaderboard-meta">
               <p>展示数量：{detail.results.length}</p>
               <p>风格：{detail.leaderboard.style === 'card' ? '卡片' : '表格'}</p>
+              <button className="btn secondary small" onClick={() => navigate(`/leaderboards/${detail.leaderboard.id}`)}>
+                独立页面
+              </button>
             </div>
           </div>
           {Array.isArray(detail.leaderboard.filters) && detail.leaderboard.filters.length > 0 && (

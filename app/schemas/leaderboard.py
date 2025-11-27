@@ -16,6 +16,8 @@ class LeaderboardCreate(BaseModel):
     sort_order: str = "desc"
     period: str = "all"
     is_public: bool = True
+    result_limit: int = Field(20, ge=1, le=200)
+    auto_refresh_minutes: int = Field(0, ge=0, le=24 * 60)
 
 
 class LeaderboardResponse(BaseModel):
@@ -32,6 +34,8 @@ class LeaderboardResponse(BaseModel):
     sort_order: str
     period: str
     is_public: bool
+    result_limit: int
+    auto_refresh_minutes: int
 
 
 class LeaderboardResultEntry(BaseModel):

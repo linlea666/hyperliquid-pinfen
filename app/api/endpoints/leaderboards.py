@@ -30,6 +30,8 @@ def serialize_lb(lb) -> LeaderboardResponse:
         sort_order=lb.sort_order,
         period=lb.period,
         is_public=bool(lb.is_public),
+        result_limit=lb.result_limit or 20,
+        auto_refresh_minutes=lb.auto_refresh_minutes or 0,
     )
 
 
@@ -54,6 +56,8 @@ def create_leaderboard(payload: LeaderboardCreate):
         sort_order=payload.sort_order,
         period=payload.period,
         is_public=1 if payload.is_public else 0,
+        result_limit=payload.result_limit,
+        auto_refresh_minutes=payload.auto_refresh_minutes,
     )
     return serialize_lb(lb)
 
@@ -74,6 +78,8 @@ def update_leaderboard(lb_id: int, payload: LeaderboardCreate):
         sort_order=payload.sort_order,
         period=payload.period,
         is_public=1 if payload.is_public else 0,
+        result_limit=payload.result_limit,
+        auto_refresh_minutes=payload.auto_refresh_minutes,
     )
     return serialize_lb(lb)
 

@@ -4,6 +4,7 @@ from typing import Any, Dict
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.triggers.cron import CronTrigger
+from apscheduler.triggers.interval import IntervalTrigger
 
 from app.core.database import session_scope
 from app.models import ScheduleJob
@@ -45,6 +46,21 @@ def refresh_jobs() -> None:
             _scheduler.add_job(run_schedule_job, trigger=trigger, args=[job.id], id=str(job.id), replace_existing=True)
         except Exception as exc:
             logger.error("Failed to schedule job %s: %s", job.name, exc)
+    # Leaderboard auto-refresh jobs
+    leaderboards = leaderboard_service.list_leaderboards(public_only=False)
+    for lb in leaderboards:
+        if lb.auto_refresh_minutes and lb.auto_refresh_minutes > 0:
+            try:
+                trigger = IntervalTrigger(minutes=lb.auto_refresh_minutes)
+                _scheduler.add_job(
+                    leaderboard_service.run_leaderboard,
+                    trigger=trigger,
+                    args=[lb.id, lb.result_limit or 20],
+                    id=f"leaderboard-auto-{lb.id}",
+                    replace_existing=True,
+                )
+            except Exception as exc:
+                logger.error("Failed to schedule leaderboard auto refresh %s: %s", lb.name, exc)
 
 
 def run_schedule_job(job_id: int) -> None:

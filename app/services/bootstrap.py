@@ -25,6 +25,10 @@ PROCESSING_COLUMNS = {
     "wallet_scores": {
         "dimension_scores": "TEXT",
     },
+    "leaderboards": {
+        "result_limit": "INTEGER DEFAULT 20",
+        "auto_refresh_minutes": "INTEGER DEFAULT 0",
+    },
 }
 
 LEADERBOARD_PRESETS = [
@@ -41,6 +45,8 @@ LEADERBOARD_PRESETS = [
         "sort_key": "portfolio_month_return",
         "sort_order": "desc",
         "period": "month",
+        "result_limit": 50,
+        "auto_refresh_minutes": 120,
     },
     {
         "name": "趋势交易榜",
@@ -55,6 +61,8 @@ LEADERBOARD_PRESETS = [
         "sort_key": "portfolio_month_return",
         "sort_order": "desc",
         "period": "month",
+        "result_limit": 40,
+        "auto_refresh_minutes": 60,
     },
     {
         "name": "资金效率榜",
@@ -68,6 +76,8 @@ LEADERBOARD_PRESETS = [
         "sort_key": "capital_efficiency",
         "sort_order": "desc",
         "period": "all",
+        "result_limit": 30,
+        "auto_refresh_minutes": 180,
     },
     {
         "name": "短线高手榜",
@@ -82,6 +92,8 @@ LEADERBOARD_PRESETS = [
         "sort_key": "win_rate",
         "sort_order": "desc",
         "period": "month",
+        "result_limit": 40,
+        "auto_refresh_minutes": 30,
     },
     {
         "name": "潜力新星榜",
@@ -96,6 +108,8 @@ LEADERBOARD_PRESETS = [
         "sort_key": "portfolio_week_return",
         "sort_order": "desc",
         "period": "week",
+        "result_limit": 30,
+        "auto_refresh_minutes": 60,
     },
     {
         "name": "资金费套利榜",
@@ -109,6 +123,8 @@ LEADERBOARD_PRESETS = [
         "sort_key": "funding_cost_ratio",
         "sort_order": "asc",
         "period": "all",
+        "result_limit": 30,
+        "auto_refresh_minutes": 240,
     },
     {
         "name": "抗波动榜",
@@ -122,6 +138,8 @@ LEADERBOARD_PRESETS = [
         "sort_key": "portfolio_month_drawdown",
         "sort_order": "asc",
         "period": "month",
+        "result_limit": 40,
+        "auto_refresh_minutes": 180,
     },
     {
         "name": "小亏大赚榜",
@@ -136,6 +154,8 @@ LEADERBOARD_PRESETS = [
         "sort_key": "avg_pnl",
         "sort_order": "desc",
         "period": "month",
+        "result_limit": 40,
+        "auto_refresh_minutes": 45,
     },
     {
         "name": "高胜率榜",
@@ -150,6 +170,8 @@ LEADERBOARD_PRESETS = [
         "sort_key": "win_rate",
         "sort_order": "desc",
         "period": "month",
+        "result_limit": 40,
+        "auto_refresh_minutes": 30,
     },
     {
         "name": "小资金高手榜",
@@ -164,6 +186,8 @@ LEADERBOARD_PRESETS = [
         "sort_key": "portfolio_month_return",
         "sort_order": "desc",
         "period": "month",
+        "result_limit": 30,
+        "auto_refresh_minutes": 60,
     },
 ]
 
@@ -217,5 +241,7 @@ def ensure_default_leaderboards():
                 sort_order=preset.get("sort_order", "desc"),
                 period=preset.get("period", "month"),
                 is_public=1,
+                result_limit=preset.get("result_limit", 20),
+                auto_refresh_minutes=preset.get("auto_refresh_minutes", 0),
             )
             session.add(lb)

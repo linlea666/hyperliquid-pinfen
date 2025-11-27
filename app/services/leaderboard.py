@@ -30,7 +30,8 @@ def create_leaderboard(**kwargs) -> Leaderboard:
         session.add(lb)
         session.flush()
         session.refresh(lb)
-        return lb
+    _refresh_leaderboard_jobs()
+    return lb
 
 
 def update_leaderboard(lb_id: int, **kwargs) -> Leaderboard:
@@ -44,7 +45,17 @@ def update_leaderboard(lb_id: int, **kwargs) -> Leaderboard:
         session.add(lb)
         session.flush()
         session.refresh(lb)
-        return lb
+    _refresh_leaderboard_jobs()
+    return lb
+
+
+def _refresh_leaderboard_jobs() -> None:
+    try:
+        from app.services import scheduler
+
+        scheduler.refresh_jobs()
+    except Exception:
+        logger.debug("Unable to refresh scheduler jobs for leaderboard changes", exc_info=True)
 
 
 def _extract_periods(metric: WalletMetric) -> dict:
@@ -73,6 +84,7 @@ def run_leaderboard(lb_id: int, limit: int = 20) -> List[LeaderboardResult]:
         lb = session.get(Leaderboard, lb_id)
         if not lb:
             raise ValueError("Leaderboard not found")
+        effective_limit = lb.result_limit or limit or 20
         sort_key = lb.sort_key or "total_pnl"
         order_column = sort_column.desc() if (lb.sort_order or "desc").lower() == "desc" else sort_column.asc()
         previous_top = (
@@ -168,7 +180,7 @@ def run_leaderboard(lb_id: int, limit: int = 20) -> List[LeaderboardResult]:
             metrics_stmt = metrics_stmt.outerjoin(alias, condition)
         if filter_exprs:
             metrics_stmt = metrics_stmt.where(and_(*filter_exprs))
-        metrics_stmt = metrics_stmt.order_by(order_column).limit(limit)
+        metrics_stmt = metrics_stmt.order_by(order_column).limit(effective_limit)
         metrics = session.execute(metrics_stmt).scalars().all()
         session.query(LeaderboardResult).filter(LeaderboardResult.leaderboard_id == lb_id).delete()
         results = []
@@ -227,12 +239,12 @@ def leaderboard_results(lb_id: int) -> List[LeaderboardResult]:
 
 
 def run_all_leaderboards(limit: int = 20) -> List[int]:
-    lb_ids = [lb.id for lb in list_leaderboards(public_only=False)]
+    lbs = list_leaderboards(public_only=False)
     updated = []
-    for lb_id in lb_ids:
+    for lb in lbs:
         try:
-            run_leaderboard(lb_id, limit=limit)
-            updated.append(lb_id)
+            run_leaderboard(lb.id, limit=lb.result_limit or limit)
+            updated.append(lb.id)
         except Exception as exc:
-            logger.warning("Failed to run leaderboard %s", lb_id, exc_info=True)
+            logger.warning("Failed to run leaderboard %s", lb.id, exc_info=True)
     return updated

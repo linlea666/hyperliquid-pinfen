@@ -29,6 +29,8 @@ class Leaderboard(Base):
     sort_order = Column(String(4), default="desc")
     period = Column(String(32), default="all")
     is_public = Column(Integer, default=1)
+    result_limit = Column(Integer, default=20)
+    auto_refresh_minutes = Column(Integer, default=0)
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
 

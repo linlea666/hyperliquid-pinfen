@@ -2,7 +2,7 @@ import json
 import logging
 from decimal import Decimal
 from pathlib import Path
-from typing import Tuple
+from typing import Optional, Tuple
 
 from sqlalchemy import asc, select
 

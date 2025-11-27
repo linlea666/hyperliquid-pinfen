@@ -22,6 +22,7 @@ DEFAULT_PROCESSING_CONFIG: Dict[str, Any] = {
     "sync_cooldown_days": 1,
     "score_cooldown_days": 7,
     "ai_cooldown_days": 30,
+    "portfolio_refresh_hours": 24,
 }
 
 DEFAULT_TEMPLATES: List[Dict[str, Any]] = [
@@ -130,6 +131,7 @@ def validate_processing_config(config: Dict[str, Any]) -> None:
         "sync_cooldown_days",
         "score_cooldown_days",
         "ai_cooldown_days",
+        "portfolio_refresh_hours",
     ):
         value = merged.get(key)
         if not isinstance(value, int) or value <= 0:

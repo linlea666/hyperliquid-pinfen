@@ -1,5 +1,5 @@
 from datetime import datetime
-from sqlalchemy import BigInteger, Column, DateTime, Integer, Numeric, String, UniqueConstraint
+from sqlalchemy import BigInteger, Column, DateTime, Integer, Numeric, String, Text, UniqueConstraint
 
 from app.core.database import Base
 
@@ -18,3 +18,19 @@ class PortfolioSeries(Base):
     pnl = Column(Numeric(38, 18))
     vlm = Column(Numeric(38, 18))
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+
+
+class PortfolioSnapshot(Base):
+    __tablename__ = "portfolio_snapshots"
+    __table_args__ = (
+        UniqueConstraint("user", "period", name="uq_portfolio_snapshot_user_period"),
+    )
+
+    id = Column(Integer, primary_key=True, index=True)
+    user = Column(String(64), nullable=False, index=True)
+    period = Column(String(16), nullable=False, index=True)
+    payload = Column(Text, nullable=False)
+    return_pct = Column(Numeric(38, 18))
+    max_drawdown_pct = Column(Numeric(38, 18))
+    volume = Column(Numeric(38, 18))
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)

@@ -192,6 +192,12 @@
   color: #fff;
 }
 
+.toggle-group {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+}
+
 .table-wrapper {
   overflow-x: auto;
 }

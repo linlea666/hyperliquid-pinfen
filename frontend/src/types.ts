@@ -57,8 +57,11 @@ export interface WalletSummary {
   last_error?: string;
   note?: string | null;
   created_at: string;
+  first_trade_time?: string;
+  active_days?: number;
   metric?: WalletMetric;
   metric_period?: string;
+  portfolio?: Record<string, PortfolioStats>;
   score?: {
     score: string;
     level: string;
@@ -73,6 +76,13 @@ export interface WalletListResponse {
 export interface WalletNoteResponse {
   address: string;
   note?: string | null;
+}
+
+export interface PortfolioStats {
+  return_pct?: string;
+  max_drawdown_pct?: string;
+  volume?: string;
+  updated_at?: string;
 }
 
 export interface WalletOverview {
@@ -317,6 +327,7 @@ export interface ProcessingConfig {
   sync_cooldown_days: number;
   score_cooldown_days: number;
   ai_cooldown_days: number;
+  portfolio_refresh_hours: number;
 }
 
 export interface ProcessingTemplate {

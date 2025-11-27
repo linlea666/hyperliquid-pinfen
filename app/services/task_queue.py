@@ -66,12 +66,15 @@ def run_wallet_sync(address: str, end_time: int | None = None, log_id: int | Non
     try:
         ledger = etl.sync_ledger(address, end_time=end_time)
         fills = etl.sync_fills(address, end_time=end_time)
+        funding = etl.sync_funding(address, end_time=end_time)
+        etl.sync_user_fees(address)
         positions = etl.sync_positions(address)
         orders = etl.sync_orders(address)
         portfolio_points = etl.sync_portfolio_series(address)
         result = {
             "fills": fills,
             "ledger": ledger,
+            "funding": funding,
             "positions": positions,
             "orders": orders,
             "portfolio_points": portfolio_points,

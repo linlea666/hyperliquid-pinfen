@@ -1,12 +1,62 @@
 import json
 import logging
 from decimal import Decimal
+from pathlib import Path
 from typing import Tuple
 
 from sqlalchemy import asc, select
 
 from app.core.database import session_scope
-from app.models import Fill, WalletMetric, WalletScore
+from app.models import Fill, WalletMetric, WalletScore, PortfolioSnapshot
+from app.core.config import get_settings
+
+SETTINGS = get_settings()
+
+
+def _funding_stats(user: str) -> Tuple[Decimal, Decimal]:
+    path = SETTINGS.cache_dir / user.lower() / "funding.jsonl"
+    paid = Decimal(0)
+    received = Decimal(0)
+    if not path.exists():
+        return paid, received
+    with path.open("r", encoding="utf-8") as fh:
+        for line in fh:
+            line = line.strip()
+            if not line:
+                continue
+            try:
+                item = json.loads(line)
+                delta = item.get("delta", {})
+                amount = Decimal(str(delta.get("usdc", "0") or "0"))
+                if amount < 0:
+                    paid += -amount
+                else:
+                    received += amount
+            except Exception:
+                continue
+    return paid, received
+
+
+def _fee_rates(user: str) -> dict:
+    path = SETTINGS.cache_dir / user.lower() / "fees.json"
+    if not path.exists():
+        return {}
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+        return {
+            "userCrossRate": float(data.get("userCrossRate") or 0),
+            "userAddRate": float(data.get("userAddRate") or 0),
+            "userSpotCrossRate": float(data.get("userSpotCrossRate") or 0),
+            "userSpotAddRate": float(data.get("userSpotAddRate") or 0),
+        }
+    except Exception:
+        return {}
+
+
+def _portfolio_snapshot(session, user: str, period: str) -> Optional[PortfolioSnapshot]:
+    return session.execute(
+        select(PortfolioSnapshot).where(PortfolioSnapshot.user == user, PortfolioSnapshot.period == period)
+    ).scalar_one_or_none()
 from app.services import scoring_config
 
 logger = logging.getLogger(__name__)
@@ -122,8 +172,32 @@ def compute_metrics(user: str) -> Tuple[WalletMetric, WalletScore]:
                 "pnl": pnl_float,
                 "return": ratio,
                 "trades": stats["trades"],
-            }
+        }
         details["periods"] = period_results
+
+        funding_paid, funding_received = _funding_stats(user)
+        details["funding_paid"] = float(funding_paid)
+        details["funding_received"] = float(funding_received)
+        denom = abs(total_pnl) + Decimal(1)
+        details["funding_cost_ratio"] = float((funding_paid / denom)) if denom else 0.0
+
+        fee_rates = _fee_rates(user)
+        details.update({
+            "effective_fee_cross": fee_rates.get("userCrossRate"),
+            "effective_fee_add": fee_rates.get("userAddRate"),
+        })
+
+        portfolio_week = _portfolio_snapshot(session, user, "week")
+        portfolio_month = _portfolio_snapshot(session, user, "month")
+        portfolio_all = _portfolio_snapshot(session, user, "allTime")
+        if portfolio_week:
+            details["portfolio_return_7d"] = float(portfolio_week.return_pct or 0)
+            details["portfolio_max_drawdown_7d"] = float(portfolio_week.max_drawdown_pct or 0)
+        if portfolio_month:
+            details["portfolio_return_30d"] = float(portfolio_month.return_pct or 0)
+            details["portfolio_max_drawdown_30d"] = float(portfolio_month.max_drawdown_pct or 0)
+        if portfolio_all:
+            details["portfolio_return_all"] = float(portfolio_all.return_pct or 0)
 
         metric = WalletMetric(
             user=user,

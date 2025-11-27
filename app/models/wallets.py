@@ -18,6 +18,7 @@ class Wallet(Base):
     ai_status = Column(String(16), default="pending", nullable=False)
     tags = Column(Text, default="[]")
     source = Column(String(32), default="manual")
+    first_trade_time = Column(DateTime)
     last_synced_at = Column(DateTime)
     last_score_at = Column(DateTime)
     last_ai_at = Column(DateTime)

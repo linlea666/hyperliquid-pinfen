@@ -1,14 +1,25 @@
 import json
 import logging
+from datetime import datetime
 from decimal import Decimal
 from typing import Dict, List, Optional
 
-from sqlalchemy import select, update
+from sqlalchemy import select, update, func
 from sqlalchemy.dialects.sqlite import insert as sqlite_insert
 
 from app.core.database import session_scope
-from app.models import FetchCursor, Fill, LedgerEvent, PositionSnapshot, OrderHistory, PortfolioSeries
+from app.models import (
+    FetchCursor,
+    Fill,
+    LedgerEvent,
+    PositionSnapshot,
+    OrderHistory,
+    PortfolioSeries,
+    PortfolioSnapshot,
+    Wallet,
+)
 from app.services.hyperliquid_client import HyperliquidClient
+from app.services import local_cache, processing_config
 from app.services import local_cache
 
 logger = logging.getLogger(__name__)
@@ -97,6 +108,7 @@ def sync_fills(user: str, end_time: Optional[int] = None) -> int:
         initial_only = start_time <= 1
         new_rows = 0
         last_time_written: Optional[int] = None
+        earliest_time: Optional[int] = None
         while True:
             batch = client.user_fills(user=user, start_time=start_time, end_time=end_time)
             if not batch:
@@ -128,6 +140,7 @@ def sync_fills(user: str, end_time: Optional[int] = None) -> int:
                 event_time = item["time"]
                 start_time = max(start_time, event_time + 1)
                 last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
+                earliest_time = event_time if earliest_time is None else min(earliest_time, event_time)
             if len(batch) < 2000:
                 break
             if initial_only:
@@ -136,7 +149,47 @@ def sync_fills(user: str, end_time: Optional[int] = None) -> int:
             cursor_value = last_time_written if last_time_written is not None else (start_time - 1)
             _upsert_cursor(session, user, "fills", cursor_value)
             local_cache.update_metadata(user, last_fill_time_ms=cursor_value)
+            wallet = session.execute(select(Wallet).where(Wallet.address == user)).scalar_one_or_none()
+            computed_ts = earliest_time if earliest_time is not None else cursor_value
+            if wallet and computed_ts:
+                if wallet.first_trade_time is None or wallet.first_trade_time.timestamp() * 1000 > computed_ts:
+                    wallet.first_trade_time = datetime.utcfromtimestamp(computed_ts / 1000)
+                    session.add(wallet)
         return new_rows
+
+
+def sync_funding(user: str, end_time: Optional[int] = None) -> int:
+    with session_scope() as session, HyperliquidClient() as client:
+        start_time = _get_cursor(session, user, "funding") + 1
+        initial_only = start_time <= 1
+        new_rows = 0
+        last_time_written: Optional[int] = None
+        while True:
+            batch = client.user_funding(user=user, start_time=start_time, end_time=end_time)
+            if not batch:
+                break
+            local_cache.append_events(user, "funding", batch)
+            for item in batch:
+                event_time = item["time"]
+                start_time = max(start_time, event_time + 1)
+                last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
+                new_rows += 1
+            if len(batch) < 2000:
+                break
+            if initial_only:
+                break
+        if new_rows:
+            cursor_value = last_time_written if last_time_written is not None else (start_time - 1)
+            _upsert_cursor(session, user, "funding", cursor_value)
+            local_cache.update_metadata(user, last_funding_time_ms=cursor_value)
+        return new_rows
+
+
+def sync_user_fees(user: str) -> None:
+    with HyperliquidClient() as client:
+        payload = client.user_fees(user=user)
+    local_cache.write_json(user, "fees.json", payload)
+    local_cache.update_metadata(user, last_fee_sync_ms=int(datetime.utcnow().timestamp() * 1000))
 
 
 def sync_positions(user: str) -> int:
@@ -223,10 +276,24 @@ def sync_orders(user: str) -> int:
         return new_rows
 
 
-def sync_portfolio_series(user: str) -> int:
+def _should_refresh_portfolio(session, user: str) -> bool:
+    now = datetime.utcnow()
+    min_hours = processing_config.get_processing_config().get("portfolio_refresh_hours", 24)
+    last = session.execute(
+        select(PortfolioSnapshot.updated_at).where(PortfolioSnapshot.user == user).order_by(PortfolioSnapshot.updated_at.desc())
+    ).scalars().first()
+    if not last:
+        return True
+    return (now - last).total_seconds() >= min_hours * 3600
+
+
+def sync_portfolio_series(user: str, force: bool = False) -> int:
     """Fetch portfolio time series and store account value/pnl per interval."""
-    with session_scope() as session, HyperliquidClient() as client:
-        data = client.portfolio(user=user)
+    with session_scope() as session:
+        if not force and not _should_refresh_portfolio(session, user):
+            return 0
+        with HyperliquidClient() as client:
+            data = client.portfolio(user=user)
         if not data or not isinstance(data, list):
             return 0
         written = 0
@@ -236,7 +303,6 @@ def sync_portfolio_series(user: str) -> int:
             interval, payload = interval_pair
             av_hist = {int(ts): val for ts, val in payload.get("accountValueHistory", [])}
             pnl_hist = {int(ts): val for ts, val in payload.get("pnlHistory", [])}
-            # Combine timestamps
             ts_set = set(av_hist.keys()) | set(pnl_hist.keys())
             for ts in ts_set:
                 stmt = sqlite_insert(PortfolioSeries).values(
@@ -250,6 +316,44 @@ def sync_portfolio_series(user: str) -> int:
                 result = session.execute(stmt)
                 if result.rowcount:
                     written += 1
-        if written:
-            _upsert_cursor(session, user, "portfolio", 0)
+            ret_pct, drawdown_pct = _compute_portfolio_metrics(list(av_hist.items()))
+            snapshot_stmt = sqlite_insert(PortfolioSnapshot).values(
+                user=user,
+                period=interval,
+                payload=json.dumps(payload),
+                return_pct=ret_pct,
+                max_drawdown_pct=drawdown_pct,
+                volume=_dec(payload.get("vlm")),
+                updated_at=datetime.utcnow(),
+            ).prefix_with("OR REPLACE")
+            session.execute(snapshot_stmt)
         return written
+
+
+def _compute_portfolio_metrics(av_hist: list[tuple[int, str]]) -> tuple[Optional[Decimal], Optional[Decimal]]:
+    if not av_hist:
+        return None, None
+    sorted_hist = sorted(av_hist, key=lambda x: x[0])
+    values: List[Decimal] = []
+    for _, val in sorted_hist:
+        try:
+            values.append(Decimal(str(val)))
+        except Exception:
+            continue
+    if len(values) < 2:
+        return None, None
+    start_val = values[0]
+    end_val = values[-1]
+    if start_val == 0:
+        ret_pct = None
+    else:
+        ret_pct = (end_val - start_val) / start_val
+    peak = values[0]
+    max_drawdown = Decimal("0")
+    for val in values:
+        if val > peak:
+            peak = val
+        drawdown = (val - peak) / peak if peak != 0 else Decimal("0")
+        if drawdown < max_drawdown:
+            max_drawdown = drawdown
+    return ret_pct, max_drawdown

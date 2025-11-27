@@ -43,6 +43,15 @@ class HyperliquidClient:
             return self._post(body)
         return self._post({"type": "userFills", "user": user})
 
+    def user_funding(self, user: str, start_time: int, end_time: Optional[int] = None) -> List[Dict[str, Any]]:
+        body: Dict[str, Any] = {"type": "userFunding", "user": user, "startTime": start_time}
+        if end_time:
+            body["endTime"] = end_time
+        return self._post(body)
+
+    def user_fees(self, user: str) -> Dict[str, Any]:
+        return self._post({"type": "userFees", "user": user})
+
     def portfolio(self, user: str) -> Any:
         return self._post({"type": "portfolio", "user": user})
 

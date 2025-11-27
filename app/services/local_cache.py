@@ -37,3 +37,8 @@ def update_metadata(address: str, **fields: Any) -> None:
             data = {}
     data.update(fields)
     meta_path.write_text(json.dumps(data, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def write_json(address: str, filename: str, payload: Any) -> None:
+    path = _wallet_dir(address) / filename
+    path.write_text(json.dumps(payload, ensure_ascii=False, indent=2), encoding="utf-8")

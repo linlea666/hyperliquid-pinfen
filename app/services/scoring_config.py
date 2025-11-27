@@ -56,6 +56,24 @@ DEFAULT_SCORING_CONFIG: Dict[str, Any] = {
                 {"field": "capital_efficiency", "min": 0, "max": 1, "higher_is_better": True, "weight": 1},
             ],
         },
+        {
+            "key": "cost",
+            "name": "成本控制",
+            "weight": 10,
+            "indicators": [
+                {"field": "funding_cost_ratio", "min": 0, "max": 1, "higher_is_better": False, "weight": 1},
+                {"field": "effective_fee_cross", "min": 0, "max": 0.002, "higher_is_better": False, "weight": 1},
+            ],
+        },
+        {
+            "key": "portfolio",
+            "name": "官方表现",
+            "weight": 15,
+            "indicators": [
+                {"field": "portfolio_return_30d", "min": -0.5, "max": 0.5, "higher_is_better": True, "weight": 1},
+                {"field": "portfolio_max_drawdown_30d", "min": 0, "max": 0.5, "higher_is_better": False, "weight": 1},
+            ],
+        },
     ],
     "levels": [
         {"level": "S", "min_score": 90},

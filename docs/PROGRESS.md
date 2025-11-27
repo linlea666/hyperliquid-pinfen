@@ -70,4 +70,9 @@
   - 处理概览新增进度条、剩余时间估算与失败重试入口；队列中钱包按照最新评分/收益自动排序，提高高质量钱包的优先级。
   - 榜单结果包含多周期收益指标，前端可直接展示 7 日/30 日收益率与累计收益，方便对比分析。
   - 同步流程默认只拉取最近 2000 条成交/账本记录并写入 `data/cache/<wallet>` 本地 JSONL 缓存，后续增量按游标追加，评分/AI 直接读取缓存数据。
+  - 数据接口策略：
+    - **核心缓存**：`userFills`/`userFillsByTime`、`userNonFundingLedgerUpdates`、`userFunding`、`userFees` 均落盘到 JSON（fills/ledger/funding.jsonl + fees.json + meta.json），逐步构建完整交易明细与成本记录。
+    - **Portfolio 快照**：官方 `portfolio` 接口按配置的刷新频率（后台可调，如每日/每周）写入 `PortfolioSeries` 与快照表，供前端绘制收益曲线、对照回撤。
+    - **辅助接口**：`leadingVaults` 用于未来的领航者/基金榜；`historicalOrders`、`positions` 等暂按需使用。
+    - 所有周期/榜单计算以“第一笔交易/首次活动”时间为基准，依赖 fills/ledger 捕捉 earliest `time_ms`。
 - 下一步：完善批次估时与优先级策略参数化，结合批量导出、策略模板等能力。

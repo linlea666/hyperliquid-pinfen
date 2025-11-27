@@ -118,6 +118,10 @@ export default function WalletDetail() {
   }, [latest]);
   const periodStats = detail?.metric?.details?.periods ?? {};
   const selectedStats = periodStats[selectedPeriod];
+  const portfolioStats = detail?.portfolio ?? {};
+  const portfolioWeek = portfolioStats.week;
+  const portfolioMonth = portfolioStats.month;
+  const portfolioAll = portfolioStats.allTime;
   const trades = tradesData?.items ?? [];
   const tradeTotal = tradesData?.total ?? trades.length;
   const tradeTotalPages = Math.max(1, Math.ceil(tradeTotal / PAGE_SIZE));
@@ -168,6 +172,10 @@ export default function WalletDetail() {
           {detail.last_synced_at ? `最近同步：${new Date(detail.last_synced_at).toLocaleString()}` : '未同步'}
         </p>
         <p className="muted">
+          {detail.first_trade_time ? `首次交易：${new Date(detail.first_trade_time).toLocaleString()}` : '尚未产生交易'} ｜ 活跃天数：
+          {detail.active_days ?? '--'}
+        </p>
+        <p className="muted">
           标签：
           {detail.tags?.length ? (
             detail.tags.map((tag: any) => (
@@ -199,6 +207,18 @@ export default function WalletDetail() {
         />
         <MetricCard title="评分" value={detail.score?.score ?? '--'} description={detail.score?.level ?? '未评分'} />
       </section>
+
+      {Object.keys(portfolioStats).length > 0 && (
+        <section className="card mt">
+          <h3>官方 Portfolio 指标</h3>
+          <div className="grid-4">
+            <MetricCard title="7日收益率" value={formatPercent(portfolioWeek?.return_pct)} description="官方权益曲线" />
+            <MetricCard title="30日收益率" value={formatPercent(portfolioMonth?.return_pct)} description="官方权益曲线" />
+            <MetricCard title="30日最大回撤" value={formatPercent(portfolioMonth?.max_drawdown_pct)} description="Drawdown" />
+            <MetricCard title="历史收益率" value={formatPercent(portfolioAll?.return_pct)} description="All-time Return" />
+          </div>
+        </section>
+      )}
 
       <section className="card mt">
         <h3>钱包备注</h3>

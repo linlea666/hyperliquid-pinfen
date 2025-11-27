@@ -11,11 +11,17 @@ const PERIOD_OPTIONS = [
   { label: '近1年', value: '365d' },
   { label: '全部', value: 'all' },
 ];
-const SORT_FIELDS = [
+const METRIC_SORT_FIELDS = [
   { label: '胜率', value: 'win_rate' },
-  { label: '收益率', value: 'avg_pnl' },
   { label: '收益额', value: 'total_pnl' },
+  { label: '平均收益', value: 'avg_pnl' },
   { label: '交易次数', value: 'trades' },
+];
+
+const PORTFOLIO_SORT_FIELDS = [
+  { label: '官方7日收益率', value: 'portfolio_week_return' },
+  { label: '官方30日收益率', value: 'portfolio_month_return' },
+  { label: '官方30日回撤', value: 'portfolio_month_drawdown' },
 ];
 
 export default function WalletList() {
@@ -23,6 +29,7 @@ export default function WalletList() {
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(0);
   const [period, setPeriod] = useState('30d');
+  const [sortMode, setSortMode] = useState<'metric' | 'portfolio'>('metric');
   const [sortField, setSortField] = useState('win_rate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [copied, setCopied] = useState('');
@@ -34,9 +41,11 @@ export default function WalletList() {
     if (!value) return '--';
     const num = Number(value);
     if (Number.isNaN(num)) return '--';
-    return `${(num * 100).toFixed(1)}%`;
+    const sign = num > 0 ? '+' : '';
+    return `${sign}${(num * 100).toFixed(1)}%`;
   };
   const navigate = useNavigate();
+  const sortOptions = sortMode === 'metric' ? METRIC_SORT_FIELDS : PORTFOLIO_SORT_FIELDS;
 
   const { data, isFetching, error } = useQuery<WalletListResponse>({
     queryKey: ['wallets', { search, status, page, period, sortField, sortOrder }],
@@ -97,8 +106,28 @@ export default function WalletList() {
               <option value="imported">已导入</option>
               <option value="synced">已同步</option>
             </select>
+            <div className="toggle-group">
+              <button
+                className={`btn small ${sortMode === 'metric' ? 'primary' : 'ghost'}`}
+                onClick={() => {
+                  setSortMode('metric');
+                  setSortField(METRIC_SORT_FIELDS[0].value);
+                }}
+              >
+                系统指标
+              </button>
+              <button
+                className={`btn small ${sortMode === 'portfolio' ? 'primary' : 'ghost'}`}
+                onClick={() => {
+                  setSortMode('portfolio');
+                  setSortField(PORTFOLIO_SORT_FIELDS[0].value);
+                }}
+              >
+                官方指标
+              </button>
+            </div>
             <select value={sortField} onChange={(e) => setSortField(e.target.value)}>
-              {SORT_FIELDS.map((field) => (
+              {sortOptions.map((field) => (
                 <option key={field.value} value={field.value}>
                   {field.label}排序
                 </option>
@@ -133,12 +162,14 @@ export default function WalletList() {
               <tr>
                 <th>地址</th>
                 <th>状态</th>
+                <th>活跃天数</th>
                 <th>同步阶段</th>
                 <th>标签</th>
                 <th>备注</th>
                 <th>胜率</th>
                 <th>累计盈亏</th>
-                <th>平均盈亏</th>
+                <th>30日收益率</th>
+                <th>30日回撤</th>
                 <th>操作</th>
               </tr>
             </thead>
@@ -155,6 +186,9 @@ export default function WalletList() {
                   </td>
                   <td>
                     <span className={`status ${wallet.status}`}>{wallet.status}</span>
+                  </td>
+                  <td>
+                    {wallet.active_days != null ? `${wallet.active_days}天` : '--'}
                   </td>
                   <td>
                     <div className="status-stack">
@@ -184,7 +218,10 @@ export default function WalletList() {
                     {wallet.metric?.total_pnl ? currencyFormatter.format(Number(wallet.metric.total_pnl)) : '--'}
                   </td>
                   <td>
-                    {wallet.metric?.avg_pnl ? currencyFormatter.format(Number(wallet.metric.avg_pnl)) : '--'}
+                    {formatPercent(wallet.portfolio?.month?.return_pct ?? wallet.portfolio?.week?.return_pct)}
+                  </td>
+                  <td>
+                    {formatPercent(wallet.portfolio?.month?.max_drawdown_pct)}
                   </td>
                   <td>
                     <button className="btn small" onClick={() => navigate(`/wallets/${wallet.address}`)}>

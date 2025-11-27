@@ -62,6 +62,10 @@ export default function AdminPanel() {
     volume: '成交额（USDC），衡量资金效率',
     equity_stability: '权益稳定性分布（0-1）',
     capital_efficiency: '资金效率指标（0-1）',
+    funding_cost_ratio: '资金费支出占总收益的比例，越低越好',
+    effective_fee_cross: '当前永续 taker 手续费率，越低越好',
+    portfolio_return_30d: '官方 Portfolio 统计的 30 日收益率',
+    portfolio_max_drawdown_30d: '官方 30 日最大回撤，越低越好',
   };
   const dimensionHints: Record<string, string> = {
     profit: '衡量收益能力，越高越好',
@@ -70,6 +74,8 @@ export default function AdminPanel() {
     trades: '成交质量与活跃度',
     stability: '权益曲线平滑程度',
     capital: '资金使用效率',
+    cost: '资金费用、手续费等成本控制能力',
+    portfolio: '参考官方 Portfolio 曲线的表现',
   };
 
   useEffect(() => {
@@ -542,6 +548,15 @@ export default function AdminPanel() {
                     value={processingDraft.ai_cooldown_days}
                     onChange={(e) => updateProcessingDraft((draft) => (draft.ai_cooldown_days = Number(e.target.value)))}
                   />
+                </label>
+                <label>
+                  Portfolio 刷新 (小时)
+                  <input
+                    type="number"
+                    value={processingDraft.portfolio_refresh_hours}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.portfolio_refresh_hours = Number(e.target.value)))}
+                  />
+                  <span className="muted">用于控制官方 Portfolio 曲线的刷新频率</span>
                 </label>
               </div>
               <div className="header-actions">

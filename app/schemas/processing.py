@@ -20,6 +20,7 @@ class ProcessingConfigSchema(BaseModel):
     sync_cooldown_days: int = Field(default=1, gt=0)
     score_cooldown_days: int = Field(default=7, gt=0)
     ai_cooldown_days: int = Field(default=30, gt=0)
+    portfolio_refresh_hours: int = Field(default=24, gt=0)
 
 
 class ProcessingConfigRequest(BaseModel):

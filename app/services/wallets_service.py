@@ -17,6 +17,7 @@ from app.models import (
     WalletScore,
     WalletTag,
     Tag,
+    PortfolioSnapshot,
 )
 
 
@@ -73,6 +74,27 @@ def _tags_map(session, addresses: List[str]) -> Dict[str, List[dict]]:
                 "icon": tag.icon,
             }
         )
+    return mapping
+
+
+def _portfolio_map(session, addresses: List[str]) -> Dict[str, Dict[str, dict]]:
+    if not addresses:
+        return {}
+    rows = (
+        session.execute(
+            select(PortfolioSnapshot).where(PortfolioSnapshot.user.in_(addresses))
+        )
+        .scalars()
+        .all()
+    )
+    mapping: Dict[str, Dict[str, dict]] = {}
+    for snapshot in rows:
+        mapping.setdefault(snapshot.user, {})[snapshot.period] = {
+            "return_pct": str(snapshot.return_pct) if snapshot.return_pct is not None else None,
+            "max_drawdown_pct": str(snapshot.max_drawdown_pct) if snapshot.max_drawdown_pct is not None else None,
+            "volume": str(snapshot.volume) if snapshot.volume is not None else None,
+            "updated_at": snapshot.updated_at.isoformat(),
+        }
     return mapping
 
 
@@ -135,6 +157,25 @@ def list_wallets(
             .subquery()
         )
 
+        portfolio_week = (
+            select(
+                PortfolioSnapshot.user.label("portfolio_week_user"),
+                PortfolioSnapshot.return_pct.label("portfolio_week_return"),
+                PortfolioSnapshot.max_drawdown_pct.label("portfolio_week_drawdown"),
+            )
+            .where(PortfolioSnapshot.period == "week")
+            .subquery()
+        )
+        portfolio_month = (
+            select(
+                PortfolioSnapshot.user.label("portfolio_month_user"),
+                PortfolioSnapshot.return_pct.label("portfolio_month_return"),
+                PortfolioSnapshot.max_drawdown_pct.label("portfolio_month_drawdown"),
+            )
+            .where(PortfolioSnapshot.period == "month")
+            .subquery()
+        )
+
         sort_key_map = {
             "win_rate": metric_view.c.metric_win_rate,
             "total_pnl": metric_view.c.metric_total_pnl,
@@ -142,6 +183,10 @@ def list_wallets(
             "volume": metric_view.c.metric_volume,
             "trades": metric_view.c.metric_trades,
             "max_drawdown": metric_view.c.metric_max_drawdown,
+            "portfolio_week_return": portfolio_week.c.portfolio_week_return,
+            "portfolio_week_drawdown": portfolio_week.c.portfolio_week_drawdown,
+            "portfolio_month_return": portfolio_month.c.portfolio_month_return,
+            "portfolio_month_drawdown": portfolio_month.c.portfolio_month_drawdown,
         }
 
         metric_columns = [
@@ -159,9 +204,18 @@ def list_wallets(
             metric_view.c.metric_details,
         ]
 
+        portfolio_columns = [
+            portfolio_week.c.portfolio_week_return,
+            portfolio_week.c.portfolio_week_drawdown,
+            portfolio_month.c.portfolio_month_return,
+            portfolio_month.c.portfolio_month_drawdown,
+        ]
+
         data_query = (
-            select(Wallet, *metric_columns)
+            select(Wallet, *metric_columns, *portfolio_columns)
             .outerjoin(metric_view, Wallet.address == metric_view.c.metric_user)
+            .outerjoin(portfolio_week, Wallet.address == portfolio_week.c.portfolio_week_user)
+            .outerjoin(portfolio_month, Wallet.address == portfolio_month.c.portfolio_month_user)
             .offset(offset)
             .limit(limit)
         )
@@ -182,6 +236,7 @@ def list_wallets(
         rows = session.execute(data_query).all()
         addresses = [row[0].address for row in rows]
         tags_map = _tags_map(session, addresses)
+        portfolio_map = _portfolio_map(session, addresses)
 
     def serialize(row) -> dict:
         wallet: Wallet = row[0]
@@ -218,7 +273,10 @@ def list_wallets(
                     metric_dict["details"] = json.loads(details)
                 except Exception:
                     metric_dict["details"] = None
-        return {
+        active_days = None
+        if wallet.first_trade_time:
+            active_days = max(1, (datetime.utcnow() - wallet.first_trade_time).days)
+        result = {
             "address": wallet.address,
             "status": wallet.status,
             "sync_status": wallet.sync_status,
@@ -235,9 +293,15 @@ def list_wallets(
             "last_error": wallet.last_error,
             "note": wallet.note,
             "created_at": wallet.created_at.isoformat(),
+            "first_trade_time": wallet.first_trade_time.isoformat() if wallet.first_trade_time else None,
+            "active_days": active_days,
             "metric": metric_dict,
             "metric_period": normalized_period if metric_dict else None,
         }
+        portfolio_stats = portfolio_map.get(wallet.address)
+        if portfolio_stats:
+            result["portfolio"] = portfolio_stats
+        return result
 
     return {"total": total, "items": [serialize(row) for row in rows]}
 
@@ -264,6 +328,7 @@ def get_wallet_detail(address: str) -> Optional[dict]:
             .first()
         )
         tags_map = _tags_map(session, [address])
+        portfolio_stats = _portfolio_map(session, [address]).get(address)
     raw_tags = tags_map.get(address) or (json.loads(wallet.tags) if wallet.tags else [])
     normalized_tags = []
     for tag in raw_tags:
@@ -288,6 +353,10 @@ def get_wallet_detail(address: str) -> Optional[dict]:
         "last_error": wallet.last_error,
         "note": wallet.note,
         "created_at": wallet.created_at.isoformat(),
+        "first_trade_time": wallet.first_trade_time.isoformat() if wallet.first_trade_time else None,
+        "active_days": max(1, (datetime.utcnow() - wallet.first_trade_time).days)
+        if wallet.first_trade_time
+        else None,
     }
     metric_dict = _serialize_sa(metric)
     if metric_dict and metric.details:
@@ -305,6 +374,8 @@ def get_wallet_detail(address: str) -> Optional[dict]:
         data["metric"] = metric_dict
     if score_dict:
         data["score"] = score_dict
+    if portfolio_stats:
+        data["portfolio"] = portfolio_stats
     return data
 
 

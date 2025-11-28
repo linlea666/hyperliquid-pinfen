@@ -8,7 +8,7 @@ from app.models.wallets import Wallet
 from app.models.auth import User, Role, Permission, AuditLog, SystemConfig, UserPreference
 from app.models.tags import Tag, WalletTag
 from app.models.leaderboard import Leaderboard, LeaderboardResult
-from app.models.ai import AIAnalysis
+from app.models.ai import AIAnalysis, AIConfig
 from app.models.tasks import (
     TaskRecord,
     NotificationTemplate,
@@ -16,6 +16,7 @@ from app.models.tasks import (
     NotificationHistory,
     ScheduleJob,
     WalletProcessingLog,
+    AILog,
 )
 from app.models.wallet_import import WalletImportRecord
 
@@ -41,11 +42,13 @@ __all__ = [
     "Leaderboard",
     "LeaderboardResult",
     "AIAnalysis",
+    "AIConfig",
     "TaskRecord",
     "NotificationTemplate",
     "NotificationSubscription",
     "NotificationHistory",
     "ScheduleJob",
     "WalletProcessingLog",
+    "AILog",
     "WalletImportRecord",
 ]

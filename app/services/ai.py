@@ -6,15 +6,19 @@ from sqlalchemy import desc, select
 from app.core.database import session_scope
 from app.models import AIAnalysis, AIConfig, WalletMetric
 from app.services import tags as tag_service
+from app.services import tasks_service
 
 
 def analyze_wallet(address: str, version: str = "v1") -> AIAnalysis:
-    with session_scope() as session:
-        metric = (
-            session.execute(
-                select(WalletMetric)
-                .where(WalletMetric.user == address)
-                .order_by(desc(WalletMetric.as_of))
+    config = get_ai_config()
+    log_id = tasks_service.log_ai_start(wallet_address=address, provider=config.provider, model=config.model or "deepseek-chat")
+    try:
+        with session_scope() as session:
+            metric = (
+                session.execute(
+                    select(WalletMetric)
+                    .where(WalletMetric.user == address)
+                    .order_by(desc(WalletMetric.as_of))
             )
             .scalars()
             .first()
@@ -65,7 +69,15 @@ def analyze_wallet(address: str, version: str = "v1") -> AIAnalysis:
         session.refresh(analysis)
 
         apply_ai_labels(address, analysis)
+        tasks_service.log_ai_end(
+            log_id,
+            "success",
+            response=f"score={analysis.score}, follow_ratio={analysis.follow_ratio}",
+        )
         return analysis
+    except Exception as exc:
+        tasks_service.log_ai_end(log_id, "failed", error=str(exc))
+        raise
 @@
  def latest_analysis(address: str) -> Optional[AIAnalysis]:
 @@

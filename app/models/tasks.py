@@ -35,6 +35,23 @@ class WalletProcessingLog(Base):
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
 
 
+class AILog(Base):
+    __tablename__ = "ai_logs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    wallet_address = Column(String(64), index=True, nullable=False)
+    status = Column(String(32), default="running")
+    provider = Column(String(32), default="deepseek")
+    model = Column(String(128))
+    prompt = Column(Text, nullable=True)
+    response = Column(Text, nullable=True)
+    error = Column(Text, nullable=True)
+    tokens_used = Column(Integer, default=0)
+    cost = Column(String(32), nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    finished_at = Column(DateTime, nullable=True)
+
+
 class NotificationTemplate(Base):
     __tablename__ = "notification_templates"
 

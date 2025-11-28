@@ -43,6 +43,7 @@ PROCESSING_COLUMNS = {
         "prompt_strength": "TEXT",
         "prompt_risk": "TEXT",
         "prompt_suggestion": "TEXT",
+        "label_mapping": "TEXT",
     },
 }
 

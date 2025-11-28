@@ -67,3 +67,22 @@ class ProcessingSummaryResponse(BaseModel):
     batch_estimate_seconds: int
     scope: ProcessingScopeSummary
     last_failed: List[ProcessingLogResponse]
+
+
+class AILogResponse(BaseModel):
+    id: int
+    wallet_address: str
+    status: str
+    provider: str
+    model: str
+    prompt: Optional[str] = None
+    response: Optional[str] = None
+    error: Optional[str] = None
+    tokens_used: int
+    cost: Optional[str] = None
+    created_at: str
+    finished_at: Optional[str] = None
+
+
+class AILogListResponse(BaseModel):
+    items: List[AILogResponse]

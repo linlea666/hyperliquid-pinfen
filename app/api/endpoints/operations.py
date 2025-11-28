@@ -22,6 +22,8 @@ from app.schemas.tasks import (
     ProcessingRetryResponse,
     ProcessingSummaryResponse,
     ProcessingStageStats,
+    AILogListResponse,
+    AILogResponse,
 )
 from app.schemas.schedule import ScheduleCreate, ScheduleResponse
 from app.services import notifications as notification_service
@@ -52,6 +54,30 @@ def list_tasks(status: str | None = None, task_type: str | None = None, limit: i
                 finished_at=item.finished_at.isoformat() if item.finished_at else None,
             )
             for item in items
+        ]
+    )
+
+
+@router.get("/ai/logs", response_model=AILogListResponse, dependencies=[Depends(get_current_user)])
+def ai_logs(wallet: str | None = None, status: str | None = None, limit: int = Query(50, ge=1, le=200)):
+    logs = tasks_service.list_ai_logs(wallet=wallet, status=status, limit=limit)
+    return AILogListResponse(
+        items=[
+            AILogResponse(
+                id=log.id,
+                wallet_address=log.wallet_address,
+                status=log.status,
+                provider=log.provider,
+                model=log.model,
+                prompt=log.prompt,
+                response=log.response,
+                error=log.error,
+                tokens_used=log.tokens_used,
+                cost=log.cost,
+                created_at=log.created_at.isoformat(),
+                finished_at=log.finished_at.isoformat() if log.finished_at else None,
+            )
+            for log in logs
         ]
     )
 

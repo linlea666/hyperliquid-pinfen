@@ -5,7 +5,7 @@ from typing import List, Optional
 from sqlalchemy import select, func
 
 from app.core.database import session_scope
-from app.models import TaskRecord
+from app.models import TaskRecord, AILog
 
 
 def log_task_start(task_type: str, payload: Optional[dict] = None) -> int:
@@ -53,3 +53,41 @@ def stats() -> dict:
             select(func.count()).select_from(TaskRecord).where(TaskRecord.status == "failed")
         ).scalar_one()
     return {"total": total, "running": running, "failed": failed}
+
+
+def log_ai_start(wallet_address: str, provider: str, model: str, prompt: Optional[str] = None) -> int:
+    with session_scope() as session:
+        log = AILog(
+            wallet_address=wallet_address,
+            provider=provider,
+            model=model,
+            prompt=prompt,
+            status="running",
+        )
+        session.add(log)
+        session.flush()
+        return log.id
+
+
+def log_ai_end(log_id: int, status: str, *, response: Optional[str] = None, error: Optional[str] = None, tokens: int = 0, cost: Optional[str] = None) -> None:
+    with session_scope() as session:
+        log = session.get(AILog, log_id)
+        if not log:
+            return
+        log.status = status
+        log.response = response
+        log.error = error
+        log.tokens_used = tokens
+        log.cost = cost
+        log.finished_at = datetime.utcnow()
+        session.add(log)
+
+
+def list_ai_logs(wallet: Optional[str] = None, status: Optional[str] = None, limit: int = 50) -> List[AILog]:
+    with session_scope() as session:
+        stmt = select(AILog).order_by(AILog.created_at.desc()).limit(limit)
+        if wallet:
+            stmt = stmt.where(AILog.wallet_address == wallet)
+        if status:
+            stmt = stmt.where(AILog.status == status)
+        return session.execute(stmt).scalars().all()

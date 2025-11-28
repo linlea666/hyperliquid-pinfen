@@ -196,6 +196,21 @@ export interface TaskListResponse {
   items: TaskRecord[];
 }
 
+export interface AILogResponse {
+  id: number;
+  wallet_address: string;
+  status: string;
+  provider: string;
+  model: string;
+  prompt?: string;
+  response?: string;
+  error?: string;
+  tokens_used: number;
+  cost?: string;
+  created_at: string;
+  finished_at?: string;
+}
+
 export interface OperationsReport {
   wallet_total: number;
   synced_wallets: number;

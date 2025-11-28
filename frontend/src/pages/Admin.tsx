@@ -16,6 +16,7 @@ import type {
   LeaderboardResponse,
   TagResponse,
   TagRuleCondition,
+  AILogResponse,
 } from '../types';
 
 type AdminTab =
@@ -25,7 +26,8 @@ type AdminTab =
   | 'processing'
   | 'scoring'
   | 'leaderboards'
-  | 'tags';
+  | 'tags'
+  | 'ai-logs';
 
 interface LeaderboardDraft
   extends Omit<LeaderboardResponse, 'id' | 'filters'> {
@@ -117,6 +119,18 @@ export default function AdminPanel() {
   });
   const [tagDraft, setTagDraft] = useState<TagDraft | null>(null);
   const [savingTag, setSavingTag] = useState(false);
+  const [aiLogLimit, setAiLogLimit] = useState(50);
+  const [aiLogStatus, setAiLogStatus] = useState('');
+  const [aiLogWallet, setAiLogWallet] = useState('');
+  const { data: aiLogs, refetch: refetchAiLogs } = useQuery<AILogResponse[]>({
+    queryKey: ['ai-logs', aiLogLimit, aiLogStatus, aiLogWallet],
+    queryFn: () =>
+      apiGet<{ items: AILogResponse[] }>('/operations/ai/logs', {
+        limit: aiLogLimit,
+        status: aiLogStatus || undefined,
+        wallet: aiLogWallet || undefined,
+      }).then((res) => res.items),
+  });
   const indicatorMeta: Record<string, string> = {
     total_pnl: '单位：USDC，统计周期内的累计收益额',
     avg_pnl: '单位：USDC/笔，单笔平均盈亏',
@@ -454,6 +468,7 @@ export default function AdminPanel() {
       { key: 'scoring', label: '评分配置' },
       { key: 'leaderboards', label: '榜单配置' },
       { key: 'tags', label: '标签管理' },
+      { key: 'ai-logs', label: 'AI 日志' },
     ],
     []
   );
@@ -1235,6 +1250,70 @@ export default function AdminPanel() {
                 <p className="muted">请选择左侧标签或点击“新建标签”。</p>
               )}
             </div>
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'ai-logs' && (
+        <section className="card">
+          <h3>AI 调用日志</h3>
+          <p className="muted">用于排查 AI 分析过程中的错误与耗时。</p>
+          <div className="filters">
+            <input
+              placeholder="钱包地址"
+              value={aiLogWallet}
+              onChange={(e) => setAiLogWallet(e.target.value)}
+            />
+            <select value={aiLogStatus} onChange={(e) => setAiLogStatus(e.target.value)}>
+              <option value="">全部状态</option>
+              <option value="running">进行中</option>
+              <option value="success">成功</option>
+              <option value="failed">失败</option>
+            </select>
+            <select value={aiLogLimit} onChange={(e) => setAiLogLimit(Number(e.target.value))}>
+              <option value={20}>20 条</option>
+              <option value={50}>50 条</option>
+              <option value={100}>100 条</option>
+            </select>
+            <button className="btn secondary" onClick={() => refetchAiLogs()}>
+              刷新
+            </button>
+          </div>
+          <div className="table-wrapper mt">
+            <table>
+              <thead>
+                <tr>
+                  <th>时间</th>
+                  <th>钱包</th>
+                  <th>状态</th>
+                  <th>模型</th>
+                  <th>输出摘要</th>
+                  <th>耗时</th>
+                </tr>
+              </thead>
+              <tbody>
+                {aiLogs?.length ? (
+                  aiLogs.map((log) => (
+                    <tr key={log.id}>
+                      <td>{new Date(log.created_at).toLocaleString()}</td>
+                      <td>{log.wallet_address}</td>
+                      <td>{log.status}</td>
+                      <td>{log.model}</td>
+                      <td>{log.response || log.error || '-'}</td>
+                      <td>
+                        {log.finished_at ? `${Math.max(0, (new Date(log.finished_at).getTime() - new Date(log.created_at).getTime()) / 1000).toFixed(1)}s` : '-'}
+                      </td>
+                    </tr>
+                  ))
+                ) : (
+                  <tr>
+                    <td colSpan={6} className="muted">
+                      暂无日志记录
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
           </div>
         </section>
       )}

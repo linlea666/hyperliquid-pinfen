@@ -147,6 +147,8 @@ def analyze_wallet(address: str, version: str = "v1") -> AIAnalysis:
     except Exception as exc:
         tasks_service.log_ai_end(log_id, "failed", error=str(exc))
         raise
+
+
 def latest_analysis(address: str) -> Optional[AIAnalysis]:
     with session_scope() as session:
         return (
@@ -242,4 +244,3 @@ def apply_ai_labels(wallet_address: str, analysis: AIAnalysis) -> None:
             tag_service.assign_tag_names(wallet_address, tags_to_apply, origin="ai")
     except Exception:
         pass
-*** End Patch

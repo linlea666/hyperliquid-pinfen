@@ -40,6 +40,31 @@ export interface TagSummary {
   icon?: string;
 }
 
+export interface TagRuleCondition {
+  field: string;
+  op: string;
+  value: number | string;
+  source?: 'metric' | 'portfolio';
+  period?: string;
+}
+
+export interface TagResponse extends TagSummary {
+  description?: string;
+  parent_id?: number;
+  rule?: TagRuleCondition[] | Record<string, any> | null;
+}
+
+export interface TagPayload {
+  id?: number;
+  name: string;
+  type: string;
+  color: string;
+  icon?: string;
+  description?: string;
+  parent_id?: number;
+  rule: TagRuleCondition[] | null;
+}
+
 export interface WalletSummary {
   address: string;
   status: string;

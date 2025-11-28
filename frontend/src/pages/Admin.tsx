@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { apiGet, apiPost, apiPut } from '../api/client';
+import { apiGet, apiPost, apiPut, apiDelete } from '../api/client';
 import { showToast } from '../utils/toast';
 import type {
   Schedule,
@@ -14,15 +14,29 @@ import type {
   ProcessingBatchResponse,
   ProcessingTemplate,
   LeaderboardResponse,
+  TagResponse,
+  TagRuleCondition,
 } from '../types';
 
-type AdminTab = 'notifications' | 'schedules' | 'preferences' | 'processing' | 'scoring' | 'leaderboards';
+type AdminTab =
+  | 'notifications'
+  | 'schedules'
+  | 'preferences'
+  | 'processing'
+  | 'scoring'
+  | 'leaderboards'
+  | 'tags';
 
 interface LeaderboardDraft
   extends Omit<LeaderboardResponse, 'id' | 'filters'> {
   id?: number;
   filters: any[];
   filtersText: string;
+}
+
+interface TagDraft extends Omit<TagResponse, 'rule'> {
+  ruleText: string;
+  rule: TagRuleCondition[] | null;
 }
 
 const defaultLeaderboardDraft: LeaderboardDraft = {
@@ -41,6 +55,18 @@ const defaultLeaderboardDraft: LeaderboardDraft = {
   is_public: true,
   result_limit: 20,
   auto_refresh_minutes: 0,
+};
+
+const defaultTagDraft: TagDraft = {
+  id: undefined,
+  name: '',
+  type: 'user',
+  color: '#7c3aed',
+  icon: '',
+  description: '',
+  parent_id: undefined,
+  rule: null,
+  ruleText: '[]',
 };
 
 export default function AdminPanel() {
@@ -85,6 +111,12 @@ export default function AdminPanel() {
   });
   const [leaderboardDraft, setLeaderboardDraft] = useState<LeaderboardDraft | null>(null);
   const [savingLeaderboard, setSavingLeaderboard] = useState(false);
+  const { data: adminTags, refetch: refetchTags } = useQuery<TagResponse[]>({
+    queryKey: ['admin-tags'],
+    queryFn: () => apiGet<TagResponse[]>('/tags'),
+  });
+  const [tagDraft, setTagDraft] = useState<TagDraft | null>(null);
+  const [savingTag, setSavingTag] = useState(false);
   const indicatorMeta: Record<string, string> = {
     total_pnl: '单位：USDC，统计周期内的累计收益额',
     avg_pnl: '单位：USDC/笔，单笔平均盈亏',
@@ -133,6 +165,26 @@ export default function AdminPanel() {
       filtersText: JSON.stringify(first.filters ?? [], null, 2),
     });
   }, [adminLeaderboards]);
+
+  useEffect(() => {
+    if (!adminTags || adminTags.length === 0) {
+      if (!tagDraft) setTagDraft({ ...defaultTagDraft });
+      return;
+    }
+    if (tagDraft && tagDraft.id) return;
+    const first = adminTags[0];
+    setTagDraft({
+      id: first.id,
+      name: first.name,
+      type: first.type || 'user',
+      color: first.color || '#7c3aed',
+      icon: first.icon ?? '',
+      description: first.description ?? '',
+      parent_id: first.parent_id,
+      rule: (first.rule as TagRuleCondition[]) ?? null,
+      ruleText: JSON.stringify(first.rule ?? [], null, 2),
+    });
+  }, [adminTags]);
 
   const loadPrefs = async () => {
     if (!email) return;
@@ -304,6 +356,95 @@ export default function AdminPanel() {
     }
   };
 
+  const beginEditTag = (tag?: TagResponse) => {
+    if (!tag) {
+      setTagDraft({ ...defaultTagDraft });
+      return;
+    }
+    setTagDraft({
+      id: tag.id,
+      name: tag.name,
+      type: tag.type || 'user',
+      color: tag.color || '#7c3aed',
+      icon: tag.icon ?? '',
+      description: tag.description ?? '',
+      parent_id: tag.parent_id,
+      rule: (tag.rule as TagRuleCondition[]) ?? null,
+      ruleText: JSON.stringify(tag.rule ?? [], null, 2),
+    });
+  };
+
+  const saveTag = async () => {
+    if (!tagDraft) return;
+    let parsedRule: TagRuleCondition[] | null = null;
+    if (tagDraft.ruleText.trim()) {
+      try {
+        const parsed = JSON.parse(tagDraft.ruleText);
+        if (!Array.isArray(parsed)) {
+          throw new Error('规则必须是数组');
+        }
+        parsedRule = parsed;
+      } catch (err: any) {
+        showToast(err?.message ?? '规则需为合法 JSON 数组', 'error');
+        return;
+      }
+    }
+    const payload = {
+      name: tagDraft.name,
+      type: tagDraft.type,
+      color: tagDraft.color,
+      icon: tagDraft.icon,
+      description: tagDraft.description,
+      parent_id: tagDraft.parent_id,
+      rule: parsedRule,
+    };
+    setSavingTag(true);
+    try {
+      let resp: TagResponse;
+      if (tagDraft.id) {
+        resp = await apiPut<TagResponse>(`/tags/${tagDraft.id}`, payload);
+        showToast('标签已更新', 'success');
+      } else {
+        resp = await apiPost<TagResponse>('/tags', payload);
+        showToast('标签已创建', 'success');
+      }
+      setTagDraft({
+        id: resp.id,
+        name: resp.name,
+        type: resp.type || 'user',
+        color: resp.color || '#7c3aed',
+        icon: resp.icon ?? '',
+        description: resp.description ?? '',
+        parent_id: resp.parent_id,
+        rule: (resp.rule as TagRuleCondition[]) ?? null,
+        ruleText: JSON.stringify(resp.rule ?? [], null, 2),
+      });
+      await refetchTags();
+    } catch (err: any) {
+      showToast(err?.message ?? '保存标签失败', 'error');
+    } finally {
+      setSavingTag(false);
+    }
+  };
+
+  const deleteTag = async () => {
+    if (!tagDraft?.id) {
+      showToast('请选择要删除的标签', 'error');
+      return;
+    }
+    if (!window.confirm('确定删除该标签？关联钱包标签也会被移除。')) {
+      return;
+    }
+    try {
+      await apiDelete(`/tags/${tagDraft.id}`);
+      showToast('标签已删除', 'success');
+      await refetchTags();
+      setTagDraft({ ...defaultTagDraft });
+    } catch (err: any) {
+      showToast(err?.message ?? '删除失败', 'error');
+    }
+  };
+
   const tabButtons = useMemo(
     () => [
       { key: 'notifications', label: '通知配置' },
@@ -312,6 +453,7 @@ export default function AdminPanel() {
       { key: 'processing', label: '分析处理设置' },
       { key: 'scoring', label: '评分配置' },
       { key: 'leaderboards', label: '榜单配置' },
+      { key: 'tags', label: '标签管理' },
     ],
     []
   );
@@ -973,6 +1115,124 @@ export default function AdminPanel() {
                 </>
               ) : (
                 <p className="muted">请选择左侧榜单或点击“新建榜单”。</p>
+              )}
+            </div>
+          </div>
+        </section>
+      )}
+
+      {activeTab === 'tags' && (
+        <section className="card">
+          <h3>标签管理</h3>
+          <p className="muted">维护三层标签体系，可设置规则自动打标。</p>
+          <div className="leaderboard-admin">
+            <div className="leaderboard-admin-list">
+              <button className="btn secondary small" onClick={() => beginEditTag(undefined)}>
+                + 新建标签
+              </button>
+              <div className="scrollable">
+                {adminTags?.map((tag) => (
+                  <div
+                    key={tag.id}
+                    className={`scope-card leaderboard-item ${tagDraft?.id === tag.id ? 'active' : ''}`}
+                    style={{ borderColor: tagDraft?.id === tag.id ? tag.color || '#7c3aed' : 'rgba(255,255,255,0.05)' }}
+                  >
+                    <div className="leaderboard-item-header">
+                      <div>
+                        <strong>
+                          {tag.icon && <span className="emoji">{tag.icon}</span>} {tag.name}
+                        </strong>
+                        <p className="muted">{tag.description || '暂无描述'}</p>
+                      </div>
+                      <span className="badge" style={{ background: tag.color || '#7c3aed' }}>
+                        {tag.type}
+                      </span>
+                    </div>
+                    <p className="muted">ID: {tag.id}</p>
+                    <div className="button-row">
+                      <button className="btn small" onClick={() => beginEditTag(tag)}>
+                        编辑
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+            <div className="leaderboard-editor">
+              {tagDraft ? (
+                <>
+                  <div className="form-grid">
+                    <div className="form-field">
+                      <label>名称</label>
+                      <input value={tagDraft.name} onChange={(e) => setTagDraft((prev) => (prev ? { ...prev, name: e.target.value } : prev))} />
+                    </div>
+                    <div className="form-field">
+                      <label>类型</label>
+                      <select value={tagDraft.type} onChange={(e) => setTagDraft((prev) => (prev ? { ...prev, type: e.target.value } : prev))}>
+                        <option value="system">系统</option>
+                        <option value="ai">AI</option>
+                        <option value="user">用户</option>
+                      </select>
+                    </div>
+                    <div className="form-field">
+                      <label>颜色</label>
+                      <input type="color" value={tagDraft.color} onChange={(e) => setTagDraft((prev) => (prev ? { ...prev, color: e.target.value } : prev))} />
+                    </div>
+                    <div className="form-field">
+                      <label>图标</label>
+                      <input value={tagDraft.icon ?? ''} onChange={(e) => setTagDraft((prev) => (prev ? { ...prev, icon: e.target.value } : prev))} />
+                    </div>
+                    <div className="form-field">
+                      <label>父级标签</label>
+                      <select
+                        value={tagDraft.parent_id ?? ''}
+                        onChange={(e) =>
+                          setTagDraft((prev) =>
+                            prev ? { ...prev, parent_id: e.target.value ? Number(e.target.value) : undefined } : prev
+                          )
+                        }
+                      >
+                        <option value="">无</option>
+                        {adminTags?.map((tag) => (
+                          <option key={tag.id} value={tag.id}>
+                            {tag.name}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                  <div className="form-field">
+                    <label>描述</label>
+                    <textarea
+                      className="note-editor"
+                      value={tagDraft.description ?? ''}
+                      onChange={(e) => setTagDraft((prev) => (prev ? { ...prev, description: e.target.value } : prev))}
+                    />
+                  </div>
+                  <div className="form-field">
+                    <label>规则（JSON 数组，可选）</label>
+                    <textarea
+                      className="json-input"
+                      value={tagDraft.ruleText}
+                      onChange={(e) => setTagDraft((prev) => (prev ? { ...prev, ruleText: e.target.value } : prev))}
+                    />
+                    <p className="indicator-hint">
+                      示例：{`[{"field":"win_rate","op":">=","value":0.6}]`}
+                    </p>
+                  </div>
+                  <div className="button-row">
+                    <button className="btn primary" onClick={saveTag} disabled={savingTag}>
+                      {savingTag ? '保存中...' : '保存标签'}
+                    </button>
+                    {tagDraft.id && (
+                      <button className="btn secondary" onClick={deleteTag}>
+                        删除标签
+                      </button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <p className="muted">请选择左侧标签或点击“新建标签”。</p>
               )}
             </div>
           </div>

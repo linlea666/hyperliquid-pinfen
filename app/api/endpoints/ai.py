@@ -1,35 +1,50 @@
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Body, Depends
 
-from app.schemas.ai import AIAnalysisResponse
+from app.api.deps import get_current_user
+from app.schemas.ai import AIConfigResponse, AIConfigUpdateRequest
 from app.services import ai as ai_service
-
 
 router = APIRouter()
 
 
-@router.post("/wallets/{address}/ai", response_model=AIAnalysisResponse, summary="运行 AI 分析")
-def run_ai_analysis(address: str):
-    analysis = ai_service.analyze_wallet(address)
-    return serialize(analysis)
+@router.get("/ai/config", response_model=AIConfigResponse)
+def get_config():
+    config = ai_service.get_ai_config()
+    return AIConfigResponse(
+        is_enabled=bool(config.is_enabled),
+        provider=config.provider,
+        api_key='***' if config.api_key else None,
+        model=config.model,
+        base_url=config.base_url,
+        max_tokens=config.max_tokens,
+        temperature=float(config.temperature or 0),
+        rate_limit_per_minute=config.rate_limit_per_minute,
+        cooldown_minutes=config.cooldown_minutes,
+        prompt_style=config.prompt_style,
+        prompt_strength=config.prompt_strength,
+        prompt_risk=config.prompt_risk,
+        prompt_suggestion=config.prompt_suggestion,
+    )
 
 
-@router.get("/wallets/{address}/ai", response_model=AIAnalysisResponse, summary="查看最新 AI 分析")
-def get_ai_analysis(address: str):
-    analysis = ai_service.latest_analysis(address)
-    if not analysis:
-        raise HTTPException(status_code=404, detail="analysis not found")
-    return serialize(analysis)
-
-
-def serialize(analysis):
-    return AIAnalysisResponse(
-        wallet_address=analysis.wallet_address,
-        version=analysis.version,
-        score=float(analysis.score) if analysis.score is not None else None,
-        style=analysis.style,
-        strengths=analysis.strengths,
-        risks=analysis.risks,
-        suggestion=analysis.suggestion,
-        follow_ratio=float(analysis.follow_ratio) if analysis.follow_ratio is not None else None,
-        created_at=analysis.created_at.isoformat(),
+@router.post("/ai/config", response_model=AIConfigResponse, dependencies=[Depends(get_current_user)])
+def update_config(payload: AIConfigUpdateRequest = Body(...)):
+    kwargs = payload.dict(exclude_unset=True)
+    if 'api_key' in kwargs and kwargs['api_key'] == '***':
+        kwargs.pop('api_key')
+    config = ai_service.update_ai_config(**kwargs)
+    return AIConfigResponse(
+        is_enabled=bool(config.is_enabled),
+        provider=config.provider,
+        api_key='***' if config.api_key else None,
+        model=config.model,
+        base_url=config.base_url,
+        max_tokens=config.max_tokens,
+        temperature=float(config.temperature or 0),
+        rate_limit_per_minute=config.rate_limit_per_minute,
+        cooldown_minutes=config.cooldown_minutes,
+        prompt_style=config.prompt_style,
+        prompt_strength=config.prompt_strength,
+        prompt_risk=config.prompt_risk,
+        prompt_suggestion=config.prompt_suggestion,
     )

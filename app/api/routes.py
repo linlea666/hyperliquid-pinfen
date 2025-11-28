@@ -1,6 +1,17 @@
 from fastapi import APIRouter
 
-from app.api.endpoints import health, wallets, admin, tags, leaderboards, ai, operations, auth, scoring, processing
+from app.api.endpoints import (
+    health,
+    wallets,
+    admin,
+    tags,
+    leaderboards,
+    ai,
+    operations,
+    auth,
+    scoring,
+    processing,
+)
 
 api_router = APIRouter()
 api_router.include_router(health.router, tags=["system"])

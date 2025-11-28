@@ -13,6 +13,10 @@ class TagCreateRequest(BaseModel):
     rule: Optional[dict] = None
 
 
+class TagUpdateRequest(TagCreateRequest):
+    pass
+
+
 class TagResponse(BaseModel):
     id: int
     name: str
@@ -21,6 +25,7 @@ class TagResponse(BaseModel):
     icon: Optional[str] = None
     description: Optional[str] = None
     parent_id: Optional[int] = None
+    rule: Optional[dict] = None
 
 
 class WalletTagsResponse(BaseModel):

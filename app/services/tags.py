@@ -1,5 +1,5 @@
 import json
-from typing import List, Optional
+from typing import Dict, List, Optional
 
 from sqlalchemy import Select, and_, select
 
@@ -31,6 +31,31 @@ def create_tag(name: str, tag_type: str, color: str, icon: Optional[str], descri
         session.flush()
         session.refresh(tag)
         return tag
+
+
+def update_tag(tag_id: int, payload: Dict) -> Tag:
+    with session_scope() as session:
+        tag = session.get(Tag, tag_id)
+        if not tag:
+            raise ValueError("Tag not found")
+        for key, value in payload.items():
+            if key == "rule_json":
+                setattr(tag, "rule_json", json.dumps(value) if value else None)
+            else:
+                setattr(tag, key, value)
+        session.add(tag)
+        session.flush()
+        session.refresh(tag)
+        return tag
+
+
+def delete_tag(tag_id: int) -> None:
+    with session_scope() as session:
+        tag = session.get(Tag, tag_id)
+        if not tag:
+            raise ValueError("Tag not found")
+        session.query(WalletTag).filter(WalletTag.tag_id == tag_id).delete()
+        session.delete(tag)
 
 
 def assign_tags(wallet_address: str, tag_ids: List[int]) -> List[WalletTag]:

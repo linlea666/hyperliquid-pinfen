@@ -29,6 +29,21 @@ PROCESSING_COLUMNS = {
         "result_limit": "INTEGER DEFAULT 20",
         "auto_refresh_minutes": "INTEGER DEFAULT 0",
     },
+    "ai_config": {
+        "is_enabled": "INTEGER DEFAULT 1",
+        "provider": "TEXT DEFAULT 'deepseek'",
+        "api_key": "TEXT",
+        "model": "TEXT DEFAULT 'deepseek-chat'",
+        "base_url": "TEXT",
+        "max_tokens": "INTEGER DEFAULT 1024",
+        "temperature": "NUMERIC DEFAULT 0.3",
+        "rate_limit_per_minute": "INTEGER DEFAULT 60",
+        "cooldown_minutes": "INTEGER DEFAULT 60",
+        "prompt_style": "TEXT",
+        "prompt_strength": "TEXT",
+        "prompt_risk": "TEXT",
+        "prompt_suggestion": "TEXT",
+    },
 }
 
 LEADERBOARD_PRESETS = [

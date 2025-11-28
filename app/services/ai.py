@@ -4,7 +4,7 @@ from typing import Optional
 from sqlalchemy import desc, select
 
 from app.core.database import session_scope
-from app.models import AIAnalysis, WalletMetric
+from app.models import AIAnalysis, AIConfig, WalletMetric
 
 
 def analyze_wallet(address: str, version: str = "v1") -> AIAnalysis:
@@ -76,3 +76,30 @@ def latest_analysis(address: str) -> Optional[AIAnalysis]:
             .scalars()
             .first()
         )
+
+
+def get_ai_config() -> AIConfig:
+    with session_scope() as session:
+        config = session.execute(select(AIConfig)).scalars().first()
+        if not config:
+            config = AIConfig()
+            session.add(config)
+            session.flush()
+            session.refresh(config)
+        return config
+
+
+def update_ai_config(**kwargs) -> AIConfig:
+    with session_scope() as session:
+        config = session.execute(select(AIConfig)).scalars().first()
+        if not config:
+            config = AIConfig()
+            session.add(config)
+            session.flush()
+        for key, value in kwargs.items():
+            if hasattr(config, key):
+                setattr(config, key, value)
+        session.add(config)
+        session.flush()
+        session.refresh(config)
+        return config

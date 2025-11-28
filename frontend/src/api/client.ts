@@ -53,6 +53,16 @@ export async function apiPut<T>(path: string, body?: Record<string, any>): Promi
   return res.json();
 }
 
+export async function apiDelete(path: string): Promise<void> {
+  const res = await fetch(`${API_BASE}${path}`, {
+    method: 'DELETE',
+    headers: authHeaders(),
+  });
+  if (!res.ok) {
+    throw new Error(`请求失败：${res.statusText}`);
+  }
+}
+
 export async function apiPostPublic<T>(path: string, body?: Record<string, any>): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'POST',

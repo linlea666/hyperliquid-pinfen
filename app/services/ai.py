@@ -5,6 +5,7 @@ from sqlalchemy import desc, select
 
 from app.core.database import session_scope
 from app.models import AIAnalysis, AIConfig, WalletMetric
+from app.services import tags as tag_service
 
 
 def analyze_wallet(address: str, version: str = "v1") -> AIAnalysis:
@@ -62,44 +63,54 @@ def analyze_wallet(address: str, version: str = "v1") -> AIAnalysis:
         session.add(analysis)
         session.flush()
         session.refresh(analysis)
+
+        apply_ai_labels(address, analysis)
         return analysis
-
-
-def latest_analysis(address: str) -> Optional[AIAnalysis]:
-    with session_scope() as session:
-        return (
-            session.execute(
-                select(AIAnalysis)
-                .where(AIAnalysis.wallet_address == address)
-                .order_by(desc(AIAnalysis.created_at))
-            )
-            .scalars()
-            .first()
-        )
-
-
-def get_ai_config() -> AIConfig:
-    with session_scope() as session:
-        config = session.execute(select(AIConfig)).scalars().first()
-        if not config:
-            config = AIConfig()
-            session.add(config)
-            session.flush()
-            session.refresh(config)
-        return config
-
-
-def update_ai_config(**kwargs) -> AIConfig:
-    with session_scope() as session:
-        config = session.execute(select(AIConfig)).scalars().first()
-        if not config:
-            config = AIConfig()
-            session.add(config)
-            session.flush()
-        for key, value in kwargs.items():
-            if hasattr(config, key):
-                setattr(config, key, value)
-        session.add(config)
-        session.flush()
-        session.refresh(config)
-        return config
+@@
+ def latest_analysis(address: str) -> Optional[AIAnalysis]:
+@@
+ def get_ai_config() -> AIConfig:
+@@
+ def update_ai_config(**kwargs) -> AIConfig:
+@@
+ 
++def apply_ai_labels(wallet_address: str, analysis: AIAnalysis) -> None:
++    config = get_ai_config()
++    if not config.label_mapping:
++        return
++    try:
++        import json
++
++        mapping = json.loads(config.label_mapping)
++        tags_to_apply = []
++        for rule in mapping:
++            key = rule.get("field")
++            op = rule.get("op", ">=")
++            value = rule.get("value")
++            tag_name = rule.get("tag")
++            if not key or tag_name is None:
++                continue
++            ai_value = getattr(analysis, key, None)
++            if ai_value is None:
++                continue
++            flag = False
++            if op == ">=" and ai_value >= value:
++                flag = True
++            elif op == ">" and ai_value > value:
++                flag = True
++            elif op == "<=" and ai_value <= value:
++                flag = True
++            elif op == "<" and ai_value < value:
++                flag = True
++            elif op == "==" and ai_value == value:
++                flag = True
++            elif op == "style_in" and isinstance(value, list) and analysis.style in value:
++                flag = True
++            if flag:
++                tags_to_apply.append(tag_name)
++        if tags_to_apply:
++            tag_service.ensure_tags_exist(tags_to_apply, origin="ai")
++            tag_service.assign_tag_names(wallet_address, tags_to_apply, origin="ai")
++    except Exception:
++        pass
+*** End Patch

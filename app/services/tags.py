@@ -73,6 +73,25 @@ def assign_tags(wallet_address: str, tag_ids: List[int]) -> List[WalletTag]:
         return wallet_tags
 
 
+def ensure_tags_exist(tag_names: List[str], origin: str = "ai") -> List[Tag]:
+    with session_scope() as session:
+        existing = session.execute(select(Tag).where(Tag.name.in_(tag_names))).scalars().all()
+        name_to_tag = {tag.name: tag for tag in existing}
+        for name in tag_names:
+            if name not in name_to_tag:
+                tag = Tag(name=name, type=origin, color="#22d3ee")
+                session.add(tag)
+                session.flush()
+                session.refresh(tag)
+                name_to_tag[name] = tag
+        return list(name_to_tag.values())
+
+
+def assign_tag_names(wallet_address: str, tag_names: List[str], origin: str = "ai") -> None:
+    tags = ensure_tags_exist(tag_names, origin=origin)
+    assign_tags(wallet_address, [tag.id for tag in tags])
+
+
 def wallet_tags(wallet_address: str) -> List[Tag]:
     with session_scope() as session:
         stmt = (

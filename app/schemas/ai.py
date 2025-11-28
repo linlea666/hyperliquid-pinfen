@@ -17,6 +17,7 @@ class AIConfigResponse(BaseModel):
     prompt_strength: Optional[str]
     prompt_risk: Optional[str]
     prompt_suggestion: Optional[str]
+    label_mapping: Optional[str]
 
 
 class AIConfigUpdateRequest(BaseModel):
@@ -33,3 +34,4 @@ class AIConfigUpdateRequest(BaseModel):
     prompt_strength: Optional[str] = None
     prompt_risk: Optional[str] = None
     prompt_suggestion: Optional[str] = None
+    label_mapping: Optional[str] = None

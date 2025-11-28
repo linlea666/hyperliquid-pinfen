@@ -38,4 +38,5 @@ class AIConfig(Base):
     prompt_strength = Column(Text, nullable=True)
     prompt_risk = Column(Text, nullable=True)
     prompt_suggestion = Column(Text, nullable=True)
+    label_mapping = Column(Text, nullable=True)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)

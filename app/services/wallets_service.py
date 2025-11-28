@@ -21,6 +21,9 @@ from app.models import (
     PortfolioSnapshot,
 )
 
+LEDGER_INFLOW_TYPES = {"deposit", "vaultDeposit", "vaultDistribution"}
+LEDGER_OUTFLOW_TYPES = {"withdraw", "vaultWithdraw"}
+
 
 def _serialize_sa(obj):
     if not obj:
@@ -384,6 +387,7 @@ def get_wallet_detail(address: str) -> Optional[dict]:
         )
         tags_map = _tags_map(session, [address])
         portfolio_stats = _portfolio_map(session, [address]).get(address)
+        ledger_summary = _ledger_summary(session, address)
     raw_tags = tags_map.get(address) or (json.loads(wallet.tags) if wallet.tags else [])
     normalized_tags = []
     for tag in raw_tags:
@@ -434,7 +438,37 @@ def get_wallet_detail(address: str) -> Optional[dict]:
     ai_dict = _serialize_sa(ai_analysis)
     if ai_dict:
         data["ai_analysis"] = ai_dict
+    if ledger_summary:
+        data["ledger_summary"] = ledger_summary
     return data
+
+
+def _ledger_summary(session, address: str) -> Optional[dict]:
+    value_expr = func.coalesce(LedgerEvent.usdc_value, LedgerEvent.amount, 0)
+    inflow_case = case((LedgerEvent.delta_type.in_(tuple(LEDGER_INFLOW_TYPES)), value_expr), else_=0)
+    outflow_case = case((LedgerEvent.delta_type.in_(tuple(LEDGER_OUTFLOW_TYPES)), value_expr), else_=0)
+    inflow_count_case = case((LedgerEvent.delta_type.in_(tuple(LEDGER_INFLOW_TYPES)), 1), else_=0)
+    outflow_count_case = case((LedgerEvent.delta_type.in_(tuple(LEDGER_OUTFLOW_TYPES)), 1), else_=0)
+    row = session.execute(
+        select(
+            func.sum(inflow_case).label("inflow_total"),
+            func.sum(outflow_case).label("outflow_total"),
+            func.sum(inflow_count_case).label("inflow_count"),
+            func.sum(outflow_count_case).label("outflow_count"),
+        ).where(LedgerEvent.user == address)
+    ).first()
+    if not row:
+        return None
+    inflow_total = row.inflow_total or Decimal(0)
+    outflow_total = row.outflow_total or Decimal(0)
+    summary = {
+        "inflow_total": str(inflow_total),
+        "outflow_total": str(outflow_total),
+        "net_inflow": str(inflow_total - outflow_total),
+        "inflow_count": int(row.inflow_count or 0),
+        "outflow_count": int(row.outflow_count or 0),
+    }
+    return summary
 
 
 def get_wallet_overview() -> dict:

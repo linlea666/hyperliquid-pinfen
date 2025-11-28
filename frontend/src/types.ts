@@ -97,6 +97,7 @@ export interface WalletSummary {
     score: string;
     level: string;
   };
+  ledger_summary?: LedgerSummary;
 }
 
 export interface WalletListResponse {
@@ -114,6 +115,14 @@ export interface PortfolioStats {
   max_drawdown_pct?: string;
   volume?: string;
   updated_at?: string;
+}
+
+export interface LedgerSummary {
+  inflow_total?: string;
+  outflow_total?: string;
+  net_inflow?: string;
+  inflow_count?: number;
+  outflow_count?: number;
 }
 
 export interface WalletOverview {
@@ -178,6 +187,8 @@ export interface AIAnalysisResponse {
   risks?: string;
   suggestion?: string;
   follow_ratio?: number;
+  narrative?: string;
+  metrics?: Record<string, any>;
   created_at: string;
 }
 

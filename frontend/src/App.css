@@ -134,6 +134,12 @@
   gap: 1rem;
 }
 
+.grid-2 {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: 1rem;
+}
+
 .metric-card {
   padding: 1rem;
   border-radius: 16px;
@@ -159,6 +165,16 @@
 }
 .metric-value.small {
   font-size: 1.2rem;
+}
+
+.ai-narrative {
+  margin-top: 1rem;
+  padding: 1rem;
+  background: rgba(255, 255, 255, 0.02);
+  border-radius: 16px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  white-space: pre-wrap;
+  line-height: 1.6;
 }
 
 .filters {

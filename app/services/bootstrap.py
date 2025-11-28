@@ -45,6 +45,10 @@ PROCESSING_COLUMNS = {
         "prompt_suggestion": "TEXT",
         "label_mapping": "TEXT",
     },
+    "ai_analysis": {
+        "narrative": "TEXT",
+        "metrics": "TEXT",
+    },
 }
 
 LEADERBOARD_PRESETS = [

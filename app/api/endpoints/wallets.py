@@ -25,6 +25,8 @@ from app.services import scoring
 from app.services import task_queue
 from app.services import wallets_service
 from app.services import processing as processing_service
+from app.schemas.ai import AIAnalysisResponse
+from app.services import ai as ai_service
 
 router = APIRouter()
 
@@ -136,6 +138,23 @@ def wallet_update_note(address: str, payload: WalletNoteRequest) -> WalletNoteRe
     if note is None and payload.note is not None:
         raise HTTPException(status_code=404, detail="wallet not found")
     return WalletNoteResponse(address=address, note=note)
+
+
+@router.get("/wallets/{address}/ai", response_model=AIAnalysisResponse, summary="获取钱包 AI 分析")
+def wallet_ai_detail(address: str) -> AIAnalysisResponse:
+    analysis = ai_service.latest_analysis(address)
+    if not analysis:
+        raise HTTPException(status_code=404, detail="暂无 AI 分析")
+    return AIAnalysisResponse(**ai_service.serialize_analysis(analysis))
+
+
+@router.post("/wallets/{address}/ai", response_model=AIAnalysisResponse, dependencies=[Depends(get_current_user)], summary="触发 AI 分析")
+def wallet_ai_generate(address: str) -> AIAnalysisResponse:
+    config = ai_service.get_ai_config()
+    if not config.is_enabled:
+        raise HTTPException(status_code=400, detail="AI 分析未开启")
+    analysis = ai_service.analyze_wallet(address)
+    return AIAnalysisResponse(**ai_service.serialize_analysis(analysis))
 
 
 @router.get("/wallets/ledger", summary="分页查询账本事件")

@@ -16,6 +16,8 @@ class AIAnalysis(Base):
     strengths = Column(Text)
     risks = Column(Text)
     suggestion = Column(Text)
+    narrative = Column(Text)
+    metrics = Column(Text)
     follow_ratio = Column(Numeric(5, 2))
     status = Column(String(32), default="completed")
     created_at = Column(DateTime, default=datetime.utcnow, nullable=False)

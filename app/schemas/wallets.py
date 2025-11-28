@@ -141,8 +141,12 @@ class WalletSummary(BaseModel):
     last_error: Optional[str] = None
     note: Optional[str] = None
     created_at: str
+    first_trade_time: Optional[str] = None
+    active_days: Optional[int] = None
     metric: Optional[dict] = None
     metric_period: Optional[str] = None
+    portfolio: Optional[dict] = None
+    ai_analysis: Optional[dict] = None
 
 
 class WalletListResponse(BaseModel):
@@ -152,6 +156,7 @@ class WalletListResponse(BaseModel):
 
 class WalletDetailResponse(WalletSummary):
     score: Optional[dict] = None
+    ledger_summary: Optional[dict] = None
 
 
 class WalletNoteRequest(BaseModel):

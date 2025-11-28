@@ -142,6 +142,15 @@ export default function WalletDetail() {
     }
     return Array.from(seen.values());
   }, [latest]);
+  const aiStats = (aiAnalysis?.metrics as Record<string, number>) || {};
+  const ledgerSummary = detail?.ledger_summary;
+
+  const formatPercentValue = (value?: number | string | null) => {
+    if (value === undefined || value === null) return '--';
+    const num = Number(value);
+    if (Number.isNaN(num)) return '--';
+    return `${num.toFixed(1)}%`;
+  };
 
   if (isLoading) {
     return <div className="card">加载中...</div>;
@@ -311,11 +320,28 @@ export default function WalletDetail() {
         <h3>AI 分析</h3>
         {aiAnalysis ? (
           <>
-            <p>风格：{aiAnalysis.style}</p>
-            <p>得分：{aiAnalysis.score ?? '--'} ｜ 推荐跟单比例：{aiAnalysis.follow_ratio ?? '--'}%</p>
-            <p>优势：{aiAnalysis.strengths}</p>
-            <p>风险：{aiAnalysis.risks}</p>
-            <p>建议：{aiAnalysis.suggestion}</p>
+            <div className="grid-4">
+              <MetricCard
+                title="AI 评分"
+                value={aiAnalysis.score ? aiAnalysis.score.toFixed(1) : '--'}
+                description={`建议仓位 ${aiAnalysis.follow_ratio ?? '--'}%`}
+              />
+              <MetricCard title="30日收益率" value={formatPercentValue(aiStats.month_return_pct)} description="AI 评估" />
+              <MetricCard title="30日最大回撤" value={formatPercentValue(aiStats.month_drawdown_pct)} description="AI 评估" />
+              <MetricCard title="胜率" value={formatPercentValue(aiStats.win_rate_pct)} description="AI 评估" />
+            </div>
+            <div className="grid-2 mt">
+              <div>
+                <h4>优势</h4>
+                <p>{aiAnalysis.strengths || '暂无'}</p>
+              </div>
+              <div>
+                <h4>风险提示</h4>
+                <p>{aiAnalysis.risks || '暂无'}</p>
+              </div>
+            </div>
+            {aiAnalysis.narrative && <pre className="ai-narrative">{aiAnalysis.narrative}</pre>}
+            <p className="muted mt">建议：{aiAnalysis.suggestion}</p>
           </>
         ) : (
           <button
@@ -331,6 +357,29 @@ export default function WalletDetail() {
           </button>
         )}
       </section>
+
+      {ledgerSummary && (
+        <section className="card mt">
+          <h3>资金流统计</h3>
+          <div className="grid-4">
+            <MetricCard
+              title="累计存入"
+              value={currencyFormatter.format(Number(ledgerSummary.inflow_total ?? 0))}
+              description={`${ledgerSummary.inflow_count ?? 0} 笔`}
+            />
+            <MetricCard
+              title="累计取出"
+              value={currencyFormatter.format(Number(ledgerSummary.outflow_total ?? 0))}
+              description={`${ledgerSummary.outflow_count ?? 0} 笔`}
+            />
+            <MetricCard
+              title="净流入"
+              value={currencyFormatter.format(Number(ledgerSummary.net_inflow ?? 0))}
+              description="存入 - 取出"
+            />
+          </div>
+        </section>
+      )}
 
       <section className="card mt">
         <h3>历史记录</h3>

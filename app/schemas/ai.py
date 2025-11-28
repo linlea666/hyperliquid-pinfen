@@ -1,4 +1,4 @@
-from typing import Optional
+from typing import Optional, Any
 
 from pydantic import BaseModel, Field
 
@@ -35,3 +35,17 @@ class AIConfigUpdateRequest(BaseModel):
     prompt_risk: Optional[str] = None
     prompt_suggestion: Optional[str] = None
     label_mapping: Optional[str] = None
+
+
+class AIAnalysisResponse(BaseModel):
+    wallet_address: str
+    version: str
+    score: Optional[float] = None
+    style: Optional[str] = None
+    strengths: Optional[str] = None
+    risks: Optional[str] = None
+    suggestion: Optional[str] = None
+    follow_ratio: Optional[float] = None
+    narrative: Optional[str] = None
+    metrics: Optional[dict[str, Any]] = None
+    created_at: Optional[str] = None

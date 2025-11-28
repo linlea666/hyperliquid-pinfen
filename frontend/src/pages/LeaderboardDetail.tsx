@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate, useParams } from 'react-router-dom';
 
@@ -58,6 +58,10 @@ export default function LeaderboardDetail() {
 
   const lb = data.leaderboard;
 
+  const [sortKey, setSortKey] = useState<'rank' | 'win_rate' | 'total_pnl' | 'return_7d' | 'return_30d'>('rank');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
+
   const formatWinRate = (val?: number | string) => {
     if (val === undefined || val === null) return '--';
     const num = Number(val);
@@ -77,6 +81,58 @@ export default function LeaderboardDetail() {
     const num = Number(value);
     if (Number.isNaN(num)) return '--';
     return num >= 1000 ? num.toLocaleString(undefined, { maximumFractionDigits: 0 }) : num.toFixed(2);
+  };
+
+  const sortedResults = useMemo(() => {
+    if (!data) return [];
+    const clone = [...data.results];
+    switch (sortKey) {
+      case 'win_rate':
+        clone.sort((a, b) => (Number(b.metrics?.win_rate ?? 0) - Number(a.metrics?.win_rate ?? 0)));
+        break;
+      case 'total_pnl':
+        clone.sort((a, b) => Number(b.metrics?.total_pnl ?? 0) - Number(a.metrics?.total_pnl ?? 0));
+        break;
+      case 'return_7d':
+        clone.sort(
+          (a, b) => Number(b.metrics?.periods?.['7d']?.return ?? 0) - Number(a.metrics?.periods?.['7d']?.return ?? 0),
+        );
+        break;
+      case 'return_30d':
+        clone.sort(
+          (a, b) => Number(b.metrics?.periods?.['30d']?.return ?? 0) - Number(a.metrics?.periods?.['30d']?.return ?? 0),
+        );
+        break;
+      default:
+        clone.sort((a, b) => a.rank - b.rank);
+    }
+    return clone;
+  }, [data, sortKey]);
+
+  const totalPages = Math.max(1, Math.ceil(sortedResults.length / pageSize));
+  const safePage = Math.min(page, totalPages);
+  const paginatedResults = sortedResults.slice((safePage - 1) * pageSize, safePage * pageSize);
+
+  const exportCsv = () => {
+    if (!data) return;
+    const headers = ['rank', 'wallet', 'win_rate', 'total_pnl', 'return_7d', 'return_30d', 'all_pnl'];
+    const rows = data.results.map((entry) => [
+      entry.rank,
+      entry.wallet_address,
+      entry.metrics?.win_rate ?? '',
+      entry.metrics?.total_pnl ?? '',
+      entry.metrics?.periods?.['7d']?.return ?? '',
+      entry.metrics?.periods?.['30d']?.return ?? '',
+      entry.metrics?.periods?.all?.pnl ?? '',
+    ]);
+    const csv = [headers.join(','), ...rows.map((row) => row.join(','))].join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = `${lb.name}-leaderboard.csv`;
+    anchor.click();
+    URL.revokeObjectURL(url);
   };
 
   return (
@@ -103,6 +159,9 @@ export default function LeaderboardDetail() {
             <button className="btn primary" onClick={() => window.print()}>
               导出/打印
             </button>
+            <button className="btn secondary" onClick={exportCsv}>
+              导出 CSV
+            </button>
           </div>
         </div>
         {Array.isArray(lb.filters) && lb.filters.length > 0 && (
@@ -118,6 +177,47 @@ export default function LeaderboardDetail() {
 
       <section className="card">
         <h3>榜单结果</h3>
+        <div className="table-controls">
+          <label>
+            排序
+            <select value={sortKey} onChange={(e) => setSortKey(e.target.value as any)}>
+              <option value="rank">排行顺序</option>
+              <option value="win_rate">胜率（高到低）</option>
+              <option value="total_pnl">累计盈亏（高到低）</option>
+              <option value="return_7d">7 日收益率</option>
+              <option value="return_30d">30 日收益率</option>
+            </select>
+          </label>
+          <label>
+            每页数量
+            <select
+              value={pageSize}
+              onChange={(e) => {
+                setPage(1);
+                setPageSize(Number(e.target.value));
+              }}
+            >
+              <option value={10}>10</option>
+              <option value={20}>20</option>
+              <option value={50}>50</option>
+            </select>
+          </label>
+          <div className="pagination">
+            <button className="btn secondary small" disabled={safePage <= 1} onClick={() => setPage((p) => Math.max(1, p - 1))}>
+              上一页
+            </button>
+            <span className="muted">
+              第 {safePage}/{totalPages} 页
+            </span>
+            <button
+              className="btn secondary small"
+              disabled={safePage >= totalPages}
+              onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+            >
+              下一页
+            </button>
+          </div>
+        </div>
         <div className="table-wrapper">
           <table>
             <thead>
@@ -132,7 +232,7 @@ export default function LeaderboardDetail() {
               </tr>
             </thead>
             <tbody>
-              {data.results.map((entry) => (
+              {paginatedResults.map((entry) => (
                 <tr key={entry.wallet_address}>
                   <td>{entry.rank}</td>
                   <td>{entry.wallet_address}</td>

@@ -483,6 +483,30 @@
   flex-wrap: wrap;
 }
 
+.table-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  align-items: center;
+  margin-bottom: 1rem;
+}
+
+.table-controls label {
+  display: flex;
+  flex-direction: column;
+  font-size: 0.85rem;
+  color: #9ea8cf;
+}
+
+.table-controls select {
+  margin-top: 0.25rem;
+  padding: 0.4rem 0.6rem;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.04);
+  color: #fff;
+}
+
 .indicator-meta {
   display: flex;
   flex-direction: column;

@@ -2,7 +2,7 @@ import { useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { apiGet } from '../api/client';
-import type { WalletListResponse, WalletSummary } from '../types';
+import type { TagResponse, WalletListResponse, WalletSummary } from '../types';
 
 const PAGE_SIZE = 20;
 const PERIOD_OPTIONS = [
@@ -32,6 +32,7 @@ export default function WalletList() {
   const [sortMode, setSortMode] = useState<'metric' | 'portfolio'>('metric');
   const [sortField, setSortField] = useState('win_rate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
+  const [tagFilter, setTagFilter] = useState('');
   const [copied, setCopied] = useState('');
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }),
@@ -48,11 +49,12 @@ export default function WalletList() {
   const sortOptions = sortMode === 'metric' ? METRIC_SORT_FIELDS : PORTFOLIO_SORT_FIELDS;
 
   const { data, isFetching, error } = useQuery<WalletListResponse>({
-    queryKey: ['wallets', { search, status, page, period, sortField, sortOrder }],
+    queryKey: ['wallets', { search, status, page, period, sortField, sortOrder, tagFilter }],
     queryFn: () =>
       apiGet<WalletListResponse>('/wallets', {
         search: search || undefined,
         status: status || undefined,
+        tag: tagFilter || undefined,
         period,
         sort_key: sortField,
         sort_order: sortOrder,
@@ -105,6 +107,20 @@ export default function WalletList() {
               <option value="">全部状态</option>
               <option value="imported">已导入</option>
               <option value="synced">已同步</option>
+            </select>
+            <select
+              value={tagFilter}
+              onChange={(e) => {
+                setTagFilter(e.target.value);
+                setPage(0);
+              }}
+            >
+              <option value="">全部标签</option>
+              {tagOptions?.map((tag) => (
+                <option key={tag.id} value={tag.name}>
+                  {tag.name}
+                </option>
+              ))}
             </select>
             <div className="toggle-group">
               <button
@@ -268,3 +284,7 @@ export default function WalletList() {
     </div>
   );
 }
+  const { data: tagOptions } = useQuery<TagResponse[]>({
+    queryKey: ['wallet-tags'],
+    queryFn: () => apiGet<TagResponse[]>('/tags'),
+  });

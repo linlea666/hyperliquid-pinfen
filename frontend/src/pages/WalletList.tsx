@@ -24,12 +24,17 @@ const PORTFOLIO_SORT_FIELDS = [
   { label: '官方30日回撤', value: 'portfolio_month_drawdown' },
 ];
 
+const AI_SORT_FIELDS = [
+  { label: 'AI得分', value: 'ai_score' },
+  { label: 'AI推荐比例', value: 'ai_follow_ratio' },
+];
+
 export default function WalletList() {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(0);
   const [period, setPeriod] = useState('30d');
-  const [sortMode, setSortMode] = useState<'metric' | 'portfolio'>('metric');
+  const [sortMode, setSortMode] = useState<'metric' | 'portfolio' | 'ai'>('metric');
   const [sortField, setSortField] = useState('win_rate');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
   const [tagFilter, setTagFilter] = useState('');
@@ -46,7 +51,7 @@ export default function WalletList() {
     return `${sign}${(num * 100).toFixed(1)}%`;
   };
   const navigate = useNavigate();
-  const sortOptions = sortMode === 'metric' ? METRIC_SORT_FIELDS : PORTFOLIO_SORT_FIELDS;
+  const sortOptions = sortMode === 'metric' ? METRIC_SORT_FIELDS : sortMode === 'portfolio' ? PORTFOLIO_SORT_FIELDS : AI_SORT_FIELDS;
 
   const { data, isFetching, error } = useQuery<WalletListResponse>({
     queryKey: ['wallets', { search, status, page, period, sortField, sortOrder, tagFilter }],
@@ -141,6 +146,15 @@ export default function WalletList() {
               >
                 官方指标
               </button>
+              <button
+                className={`btn small ${sortMode === 'ai' ? 'primary' : 'ghost'}`}
+                onClick={() => {
+                  setSortMode('ai');
+                  setSortField(AI_SORT_FIELDS[0].value);
+                }}
+              >
+                AI 指标
+              </button>
             </div>
             <select value={sortField} onChange={(e) => setSortField(e.target.value)}>
               {sortOptions.map((field) => (
@@ -185,9 +199,10 @@ export default function WalletList() {
                 <th>胜率</th>
                 <th>累计盈亏</th>
                 <th>30日收益率</th>
-                <th>30日回撤</th>
-                <th>操作</th>
-              </tr>
+              <th>30日回撤</th>
+              <th>AI 推荐</th>
+              <th>操作</th>
+            </tr>
             </thead>
             <tbody>
               {wallets.map((wallet) => (
@@ -238,6 +253,16 @@ export default function WalletList() {
                   </td>
                   <td>
                     {formatPercent(wallet.portfolio?.month?.max_drawdown_pct)}
+                  </td>
+                  <td>
+                    {wallet.ai_analysis ? (
+                      <div>
+                        <div>{wallet.ai_analysis.follow_ratio != null ? `${wallet.ai_analysis.follow_ratio}%` : '--'}</div>
+                        <div className="muted">{wallet.ai_analysis.style ?? ''}</div>
+                      </div>
+                    ) : (
+                      <span className="muted">未生成</span>
+                    )}
                   </td>
                   <td>
                     <button className="btn small" onClick={() => navigate(`/wallets/${wallet.address}`)}>

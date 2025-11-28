@@ -9,6 +9,7 @@ from sqlalchemy import and_, asc, desc, func, select, case
 
 from app.core.database import session_scope
 from app.models import (
+    AIAnalysis,
     Fill,
     LedgerEvent,
     Wallet,
@@ -176,6 +177,31 @@ def list_wallets(
             .subquery()
         )
 
+        ai_latest = (
+            select(
+                AIAnalysis.wallet_address.label("ai_user"),
+                func.max(AIAnalysis.created_at).label("max_created"),
+            )
+            .group_by(AIAnalysis.wallet_address)
+            .subquery()
+        )
+
+        ai_view = (
+            select(
+                AIAnalysis.wallet_address.label("ai_view_user"),
+                AIAnalysis.score.label("ai_score"),
+                AIAnalysis.follow_ratio.label("ai_follow_ratio"),
+                AIAnalysis.style.label("ai_style"),
+                AIAnalysis.created_at.label("ai_created_at"),
+            )
+            .join(
+                ai_latest,
+                (AIAnalysis.wallet_address == ai_latest.c.ai_user)
+                & (AIAnalysis.created_at == ai_latest.c.max_created),
+            )
+            .subquery()
+        )
+
         sort_key_map = {
             "win_rate": metric_view.c.metric_win_rate,
             "total_pnl": metric_view.c.metric_total_pnl,
@@ -187,6 +213,8 @@ def list_wallets(
             "portfolio_week_drawdown": portfolio_week.c.portfolio_week_drawdown,
             "portfolio_month_return": portfolio_month.c.portfolio_month_return,
             "portfolio_month_drawdown": portfolio_month.c.portfolio_month_drawdown,
+            "ai_score": ai_view.c.ai_score,
+            "ai_follow_ratio": ai_view.c.ai_follow_ratio,
         }
 
         metric_columns = [
@@ -211,11 +239,20 @@ def list_wallets(
             portfolio_month.c.portfolio_month_drawdown,
         ]
 
+        ai_columns = [
+            ai_view.c.ai_view_user,
+            ai_view.c.ai_score,
+            ai_view.c.ai_follow_ratio,
+            ai_view.c.ai_style,
+            ai_view.c.ai_created_at,
+        ]
+
         data_query = (
-            select(Wallet, *metric_columns, *portfolio_columns)
+            select(Wallet, *metric_columns, *portfolio_columns, *ai_columns)
             .outerjoin(metric_view, Wallet.address == metric_view.c.metric_user)
             .outerjoin(portfolio_week, Wallet.address == portfolio_week.c.portfolio_week_user)
             .outerjoin(portfolio_month, Wallet.address == portfolio_month.c.portfolio_month_user)
+            .outerjoin(ai_view, Wallet.address == ai_view.c.ai_view_user)
             .offset(offset)
             .limit(limit)
         )
@@ -301,6 +338,14 @@ def list_wallets(
         portfolio_stats = portfolio_map.get(wallet.address)
         if portfolio_stats:
             result["portfolio"] = portfolio_stats
+        ai_user = metric_row.get("ai_view_user")
+        if ai_user:
+            result["ai_analysis"] = {
+                "score": float(metric_row.get("ai_score")) if metric_row.get("ai_score") is not None else None,
+                "follow_ratio": float(metric_row.get("ai_follow_ratio")) if metric_row.get("ai_follow_ratio") is not None else None,
+                "style": metric_row.get("ai_style"),
+                "updated_at": metric_row.get("ai_created_at").isoformat() if metric_row.get("ai_created_at") else None,
+            }
         return result
 
     return {"total": total, "items": [serialize(row) for row in rows]}
@@ -323,6 +368,16 @@ def get_wallet_detail(address: str) -> Optional[dict]:
                 select(WalletScore)
                 .where(WalletScore.user == address)
                 .order_by(desc(WalletScore.as_of))
+            )
+            .scalars()
+            .first()
+        )
+        ai_analysis = (
+            session.execute(
+                select(AIAnalysis)
+                .where(AIAnalysis.wallet_address == address)
+                .order_by(desc(AIAnalysis.created_at))
+                .limit(1)
             )
             .scalars()
             .first()
@@ -376,6 +431,9 @@ def get_wallet_detail(address: str) -> Optional[dict]:
         data["score"] = score_dict
     if portfolio_stats:
         data["portfolio"] = portfolio_stats
+    ai_dict = _serialize_sa(ai_analysis)
+    if ai_dict:
+        data["ai_analysis"] = ai_dict
     return data
 
 

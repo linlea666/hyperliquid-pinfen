@@ -87,6 +87,12 @@ export interface WalletSummary {
   metric?: WalletMetric;
   metric_period?: string;
   portfolio?: Record<string, PortfolioStats>;
+  ai_analysis?: {
+    score?: number;
+    follow_ratio?: number;
+    style?: string;
+    updated_at?: string;
+  };
   score?: {
     score: string;
     level: string;

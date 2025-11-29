@@ -54,12 +54,14 @@ export default function WalletDetail() {
     enabled: Boolean(address),
     retry: 0,
   });
-  const fetchPaged = async (path: string, page: number) => {
+  const emptyPage: PaginatedResponse<any> = { items: [], total: 0 };
+  const fetchPaged = async (path: string, page: number): Promise<PaginatedResponse<any>> => {
+    if (!address) return emptyPage;
     try {
-      return await apiGet(path, { address, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
+      return await apiGet<PaginatedResponse<any>>(path, { address, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
     } catch (err: any) {
       if (err?.status === 404) {
-        return { items: [], total: 0 };
+        return emptyPage;
       }
       throw err;
     }
@@ -134,13 +136,13 @@ export default function WalletDetail() {
   const portfolioWeek = portfolioStats.week;
   const portfolioMonth = portfolioStats.month;
   const portfolioAll = portfolioStats.allTime;
-  const trades = tradesData?.items ?? [];
+  const trades: any[] = tradesData?.items ?? [];
   const tradeTotal = tradesData?.total ?? trades.length;
   const tradeTotalPages = Math.max(1, Math.ceil(tradeTotal / PAGE_SIZE));
-  const ledgerItems = ledgerData?.items ?? [];
+  const ledgerItems: any[] = ledgerData?.items ?? [];
   const ledgerTotal = ledgerData?.total ?? ledgerItems.length;
   const ledgerTotalPages = Math.max(1, Math.ceil(ledgerTotal / PAGE_SIZE));
-  const orderItems = orderData?.items ?? [];
+  const orderItems: any[] = orderData?.items ?? [];
   const orderTotal = orderData?.total ?? orderItems.length;
   const orderTotalPages = Math.max(1, Math.ceil(orderTotal / PAGE_SIZE));
   const currentPositions = useMemo(() => {
@@ -450,7 +452,7 @@ export default function WalletDetail() {
             <tbody>
               {historyTab === 'trades' &&
                 (trades.length ? (
-                  trades.map((item) => (
+                  trades.map((item: any) => (
                     <tr key={`${item.hash}-${item.time_ms}`}>
                       <td>{item.time_ms ? new Date(Number(item.time_ms)).toLocaleString() : '-'}</td>
                       <td>{item.coin}</td>
@@ -471,7 +473,7 @@ export default function WalletDetail() {
                 ))}
               {historyTab === 'ledger' &&
                 (ledgerItems.length ? (
-                  ledgerItems.map((item) => (
+                  ledgerItems.map((item: any) => (
                     <tr key={`${item.hash}-${item.time_ms}`}>
                       <td>{item.time_ms ? new Date(Number(item.time_ms)).toLocaleString() : '-'}</td>
                       <td>{item.delta_type}</td>
@@ -488,7 +490,7 @@ export default function WalletDetail() {
                 ))}
               {historyTab === 'orders' &&
                 (orderItems.length ? (
-                  orderItems.map((item) => (
+                  orderItems.map((item: any) => (
                     <tr key={`${item.hash || item.oid}-${item.time_ms}`}>
                       <td>{item.time_ms ? new Date(Number(item.time_ms)).toLocaleString() : '-'}</td>
                       <td>{item.coin}</td>

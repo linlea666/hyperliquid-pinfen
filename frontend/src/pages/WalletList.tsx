@@ -68,6 +68,11 @@ export default function WalletList() {
       }),
   });
 
+  const { data: tagOptions } = useQuery<TagResponse[]>({
+    queryKey: ['wallet-tags'],
+    queryFn: () => apiGet<TagResponse[]>('/tags'),
+  });
+
   const wallets: WalletSummary[] = data?.items ?? [];
   const total = data?.total ?? 0;
   const totalPages = total ? Math.ceil(total / PAGE_SIZE) : 1;
@@ -309,7 +314,3 @@ export default function WalletList() {
     </div>
   );
 }
-  const { data: tagOptions } = useQuery<TagResponse[]>({
-    queryKey: ['wallet-tags'],
-    queryFn: () => apiGet<TagResponse[]>('/tags'),
-  });

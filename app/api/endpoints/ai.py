@@ -24,6 +24,7 @@ def get_config():
         prompt_strength=config.prompt_strength,
         prompt_risk=config.prompt_risk,
         prompt_suggestion=config.prompt_suggestion,
+        label_mapping=config.label_mapping,
     )
 
 
@@ -47,4 +48,5 @@ def update_config(payload: AIConfigUpdateRequest = Body(...)):
         prompt_strength=config.prompt_strength,
         prompt_risk=config.prompt_risk,
         prompt_suggestion=config.prompt_suggestion,
+        label_mapping=config.label_mapping,
     )

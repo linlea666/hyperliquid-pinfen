@@ -27,6 +27,7 @@ export default function WalletDetail() {
   const [ledgerPage, setLedgerPage] = useState(0);
   const [orderPage, setOrderPage] = useState(0);
   const [historyTab, setHistoryTab] = useState<'trades' | 'ledger' | 'orders'>('trades');
+  const [aiGenerating, setAIGenerating] = useState(false);
   const PAGE_SIZE = 20;
 
   const { data: detail, isLoading, error } = useQuery<WalletSummary>({
@@ -53,19 +54,30 @@ export default function WalletDetail() {
     enabled: Boolean(address),
     retry: 0,
   });
+  const fetchPaged = async (path: string, page: number) => {
+    try {
+      return await apiGet(path, { address, limit: PAGE_SIZE, offset: page * PAGE_SIZE });
+    } catch (err: any) {
+      if (err?.status === 404) {
+        return { items: [], total: 0 };
+      }
+      throw err;
+    }
+  };
+
   const { data: tradesData } = useQuery<PaginatedResponse<any>>({
     queryKey: ['wallet-fills', address, tradePage],
-    queryFn: () => apiGet('/wallets/fills', { address, limit: PAGE_SIZE, offset: tradePage * PAGE_SIZE }),
+    queryFn: () => fetchPaged('/wallets/fills', tradePage),
     enabled: Boolean(address),
   });
   const { data: ledgerData } = useQuery<PaginatedResponse<any>>({
     queryKey: ['wallet-ledger', address, ledgerPage],
-    queryFn: () => apiGet('/wallets/ledger', { address, limit: PAGE_SIZE, offset: ledgerPage * PAGE_SIZE }),
+    queryFn: () => fetchPaged('/wallets/ledger', ledgerPage),
     enabled: Boolean(address),
   });
   const { data: orderData } = useQuery<PaginatedResponse<any>>({
     queryKey: ['wallet-orders', address, orderPage],
-    queryFn: () => apiGet('/wallets/orders', { address, limit: PAGE_SIZE, offset: orderPage * PAGE_SIZE }),
+    queryFn: () => fetchPaged('/wallets/orders', orderPage),
     enabled: Boolean(address),
   });
   useEffect(() => {
@@ -159,6 +171,20 @@ export default function WalletDetail() {
   if (error || !detail) {
     return <div className="card error">加载失败：{(error as Error)?.message ?? '钱包不存在'}</div>;
   }
+
+  const handleGenerateAI = async () => {
+    if (!address) return;
+    try {
+      setAIGenerating(true);
+      await apiPost(`/wallets/${address}/ai`);
+      await refetchAI();
+      showToast('AI 分析已生成', 'success');
+    } catch (err: any) {
+      showToast(err?.message ?? '生成失败，请稍后重试', 'error');
+    } finally {
+      setAIGenerating(false);
+    }
+  };
 
   return (
     <div className="page">
@@ -317,7 +343,12 @@ export default function WalletDetail() {
       </section>
 
       <section className="card mt">
-        <h3>AI 分析</h3>
+        <div className="header-row">
+          <h3>AI 分析</h3>
+          <button className="btn primary" disabled={aiLoading || aiGenerating} onClick={handleGenerateAI}>
+            {aiLoading || aiGenerating ? '生成中...' : aiAnalysis ? '重新生成 AI 分析' : '生成 AI 分析'}
+          </button>
+        </div>
         {aiAnalysis ? (
           <>
             <div className="grid-4">
@@ -344,17 +375,7 @@ export default function WalletDetail() {
             <p className="muted mt">建议：{aiAnalysis.suggestion}</p>
           </>
         ) : (
-          <button
-            className="btn primary"
-            disabled={aiLoading}
-            onClick={async () => {
-              if (!address) return;
-              await apiPost<AIAnalysisResponse>(`/wallets/${address}/ai`);
-              await refetchAI();
-            }}
-          >
-            {aiLoading ? '生成中...' : '生成 AI 分析'}
-          </button>
+          <p className="muted">尚未生成 AI 分析，点击上方按钮即可创建。</p>
         )}
       </section>
 

@@ -24,7 +24,9 @@ export async function apiGet<T>(path: string, params?: Record<string, any>): Pro
     },
   });
   if (!res.ok) {
-    throw new Error(`请求失败：${res.statusText}`);
+    const error: any = new Error(`请求失败：${res.statusText}`);
+    error.status = res.status;
+    throw error;
   }
   return res.json();
 }
@@ -36,7 +38,9 @@ export async function apiPost<T>(path: string, body?: Record<string, any>): Prom
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
-    throw new Error(`请求失败：${res.statusText}`);
+    const error: any = new Error(`请求失败：${res.statusText}`);
+    error.status = res.status;
+    throw error;
   }
   return res.json();
 }
@@ -48,7 +52,9 @@ export async function apiPut<T>(path: string, body?: Record<string, any>): Promi
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
-    throw new Error(`请求失败：${res.statusText}`);
+    const error: any = new Error(`请求失败：${res.statusText}`);
+    error.status = res.status;
+    throw error;
   }
   return res.json();
 }
@@ -59,7 +65,9 @@ export async function apiDelete(path: string): Promise<void> {
     headers: authHeaders(),
   });
   if (!res.ok) {
-    throw new Error(`请求失败：${res.statusText}`);
+    const error: any = new Error(`请求失败：${res.statusText}`);
+    error.status = res.status;
+    throw error;
   }
 }
 
@@ -70,7 +78,9 @@ export async function apiPostPublic<T>(path: string, body?: Record<string, any>)
     body: body ? JSON.stringify(body) : undefined,
   });
   if (!res.ok) {
-    throw new Error(`请求失败：${res.statusText}`);
+    const error: any = new Error(`请求失败：${res.statusText}`);
+    error.status = res.status;
+    throw error;
   }
   return res.json();
 }

@@ -7,7 +7,7 @@ from sqlalchemy import select, func
 import time
 from sqlalchemy.exc import OperationalError
 
-from app.core.database import session_scope
+from app.core.database import session_scope, write_lock
 from app.models import TaskRecord, AILog
 
 
@@ -15,8 +15,9 @@ def _with_retry(operation, retries: int = 3, delay: float = 0.2):
     last_exc: Optional[Exception] = None
     for attempt in range(retries):
         try:
-            with session_scope() as session:
-                return operation(session)
+            with write_lock:
+                with session_scope() as session:
+                    return operation(session)
         except OperationalError as exc:
             last_exc = exc
             if attempt + 1 == retries:

@@ -4,7 +4,7 @@ from typing import Optional
 
 from sqlalchemy import desc, select
 
-from app.core.database import session_scope
+from app.core.database import session_scope, write_lock
 from app.models import AIAnalysis, AIConfig, WalletMetric
 from app.services import tags as tag_service
 from app.services import tasks_service
@@ -25,10 +25,26 @@ def analyze_wallet(address: str, version: str = "v1") -> AIAnalysis:
                 .first()
             )
         if not metric:
-            analysis = AIAnalysis(wallet_address=address, version=version, score=0, style="未知", strengths="暂无数据", risks="暂无数据", suggestion="暂无历史表现，建议先观察。", follow_ratio=0)
-            session.add(analysis)
-            session.flush()
-            session.refresh(analysis)
+            analysis = AIAnalysis(
+                wallet_address=address,
+                version=version,
+                score=0,
+                style="未知",
+                strengths="暂无数据",
+                risks="暂无数据",
+                suggestion="暂无历史表现，建议先观察。",
+                follow_ratio=0,
+            )
+            with write_lock:
+                with session_scope() as write_session:
+                    write_session.add(analysis)
+                    write_session.flush()
+                    write_session.refresh(analysis)
+            tasks_service.log_ai_end(
+                log_id,
+                "success",
+                response=f"score={analysis.score}, follow_ratio={analysis.follow_ratio}",
+            )
             return analysis
 
         details = {}
@@ -133,9 +149,11 @@ def analyze_wallet(address: str, version: str = "v1") -> AIAnalysis:
             narrative=narrative,
             metrics=json.dumps(metrics_payload),
         )
-        session.add(analysis)
-        session.flush()
-        session.refresh(analysis)
+        with write_lock:
+            with session_scope() as write_session:
+                write_session.add(analysis)
+                write_session.flush()
+                write_session.refresh(analysis)
 
         apply_ai_labels(address, analysis)
         tasks_service.log_ai_end(
@@ -163,27 +181,29 @@ def latest_analysis(address: str) -> Optional[AIAnalysis]:
 
 
 def get_ai_config() -> AIConfig:
-    with session_scope() as session:
-        config = session.execute(select(AIConfig).limit(1)).scalar_one_or_none()
-        if not config:
-            config = AIConfig()
-            session.add(config)
-            session.flush()
-            session.refresh(config)
-        return config
+    with write_lock:
+        with session_scope() as session:
+            config = session.execute(select(AIConfig).limit(1)).scalar_one_or_none()
+            if not config:
+                config = AIConfig()
+                session.add(config)
+                session.flush()
+                session.refresh(config)
+            return config
 
 
 def update_ai_config(**kwargs) -> AIConfig:
-    with session_scope() as session:
-        config = session.execute(select(AIConfig).limit(1)).scalar_one_or_none()
-        if not config:
-            config = AIConfig()
-        for key, value in kwargs.items():
-            setattr(config, key, value)
-        session.add(config)
-        session.flush()
-        session.refresh(config)
-        return config
+    with write_lock:
+        with session_scope() as session:
+            config = session.execute(select(AIConfig).limit(1)).scalar_one_or_none()
+            if not config:
+                config = AIConfig()
+            for key, value in kwargs.items():
+                setattr(config, key, value)
+            session.add(config)
+            session.flush()
+            session.refresh(config)
+            return config
 
 
 def serialize_analysis(analysis: AIAnalysis) -> dict:

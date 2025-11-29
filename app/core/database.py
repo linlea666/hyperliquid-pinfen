@@ -2,6 +2,7 @@ from contextlib import contextmanager
 from typing import Generator
 
 from sqlalchemy import create_engine, text
+from threading import Lock
 from sqlalchemy.orm import Session, declarative_base, sessionmaker
 
 from app.core.config import get_settings
@@ -22,6 +23,7 @@ def get_engine():
 engine = get_engine()
 with engine.connect() as conn:
     conn.execute(text("PRAGMA journal_mode=WAL"))
+write_lock = Lock()
 SessionLocal = sessionmaker(
     bind=engine,
     autoflush=False,

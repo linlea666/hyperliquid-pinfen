@@ -17,6 +17,7 @@ import type {
   TagResponse,
   TagRuleCondition,
   AILogResponse,
+  AIConfigResponse,
 } from '../types';
 
 type AdminTab =
@@ -27,6 +28,7 @@ type AdminTab =
   | 'scoring'
   | 'leaderboards'
   | 'tags'
+  | 'ai-config'
   | 'ai-logs';
 
 interface LeaderboardDraft
@@ -131,6 +133,12 @@ export default function AdminPanel() {
         wallet: aiLogWallet || undefined,
       }).then((res) => res.items),
   });
+  const { data: aiConfigResp, refetch: refetchAiConfig } = useQuery<AIConfigResponse>({
+    queryKey: ['ai-config'],
+    queryFn: () => apiGet<AIConfigResponse>('/ai/config'),
+  });
+  const [aiConfigDraft, setAiConfigDraft] = useState<AIConfigResponse | null>(null);
+  const [savingAiConfig, setSavingAiConfig] = useState(false);
   const indicatorMeta: Record<string, string> = {
     total_pnl: '单位：USDC，统计周期内的累计收益额',
     avg_pnl: '单位：USDC/笔，单笔平均盈亏',
@@ -199,6 +207,12 @@ export default function AdminPanel() {
       ruleText: JSON.stringify(first.rule ?? [], null, 2),
     });
   }, [adminTags]);
+
+  useEffect(() => {
+    if (aiConfigResp) {
+      setAiConfigDraft({ ...aiConfigResp });
+    }
+  }, [aiConfigResp]);
 
   const loadPrefs = async () => {
     if (!email) return;
@@ -468,10 +482,25 @@ export default function AdminPanel() {
       { key: 'scoring', label: '评分配置' },
       { key: 'leaderboards', label: '榜单配置' },
       { key: 'tags', label: '标签管理' },
+      { key: 'ai-config', label: 'AI 配置' },
       { key: 'ai-logs', label: 'AI 日志' },
     ],
     []
   );
+
+  const saveAiConfig = async () => {
+    if (!aiConfigDraft) return;
+    try {
+      setSavingAiConfig(true);
+      await apiPost('/ai/config', aiConfigDraft);
+      showToast('AI 配置已保存', 'success');
+      await refetchAiConfig();
+    } catch (err: any) {
+      showToast(err?.message ?? '保存失败', 'error');
+    } finally {
+      setSavingAiConfig(false);
+    }
+  };
 
   return (
     <div className="page">
@@ -1251,6 +1280,151 @@ export default function AdminPanel() {
               )}
             </div>
           </div>
+        </section>
+      )}
+
+      {activeTab === 'ai-config' && (
+        <section className="card">
+          <h3>AI 配置</h3>
+          <p className="muted">设置 AI 分析的模型、密钥与提示词，保存后立即生效。</p>
+          {!aiConfigDraft ? (
+            <p className="muted">正在加载 AI 配置...</p>
+          ) : (
+            <>
+              <div className="form-grid">
+                <label className="checkbox-row inline">
+                  <input
+                    type="checkbox"
+                    checked={aiConfigDraft.is_enabled}
+                    onChange={(e) => setAiConfigDraft((prev) => (prev ? { ...prev, is_enabled: e.target.checked } : prev))}
+                  />
+                  启用 AI 分析
+                </label>
+                <label>
+                  Provider
+                  <input
+                    value={aiConfigDraft.provider}
+                    onChange={(e) => setAiConfigDraft((prev) => (prev ? { ...prev, provider: e.target.value } : prev))}
+                  />
+                </label>
+                <label>
+                  API Key
+                  <input
+                    value={aiConfigDraft.api_key ?? ''}
+                    placeholder="*** 表示已配置"
+                    onChange={(e) => setAiConfigDraft((prev) => (prev ? { ...prev, api_key: e.target.value } : prev))}
+                  />
+                </label>
+                <label>
+                  模型
+                  <input
+                    value={aiConfigDraft.model}
+                    onChange={(e) => setAiConfigDraft((prev) => (prev ? { ...prev, model: e.target.value } : prev))}
+                  />
+                </label>
+                <label>
+                  Base URL
+                  <input
+                    value={aiConfigDraft.base_url ?? ''}
+                    onChange={(e) => setAiConfigDraft((prev) => (prev ? { ...prev, base_url: e.target.value } : prev))}
+                  />
+                </label>
+                <label>
+                  最大 tokens
+                  <input
+                    type="number"
+                    value={aiConfigDraft.max_tokens}
+                    onChange={(e) =>
+                      setAiConfigDraft((prev) => (prev ? { ...prev, max_tokens: Number(e.target.value) } : prev))
+                    }
+                  />
+                </label>
+                <label>
+                  温度
+                  <input
+                    type="number"
+                    step="0.1"
+                    value={aiConfigDraft.temperature}
+                    onChange={(e) =>
+                      setAiConfigDraft((prev) => (prev ? { ...prev, temperature: Number(e.target.value) } : prev))
+                    }
+                  />
+                </label>
+                <label>
+                  每分钟限速
+                  <input
+                    type="number"
+                    value={aiConfigDraft.rate_limit_per_minute}
+                    onChange={(e) =>
+                      setAiConfigDraft((prev) =>
+                        prev ? { ...prev, rate_limit_per_minute: Number(e.target.value) } : prev,
+                      )
+                    }
+                  />
+                </label>
+                <label>
+                  冷却时间 (分钟)
+                  <input
+                    type="number"
+                    value={aiConfigDraft.cooldown_minutes}
+                    onChange={(e) =>
+                      setAiConfigDraft((prev) => (prev ? { ...prev, cooldown_minutes: Number(e.target.value) } : prev))
+                    }
+                  />
+                </label>
+              </div>
+              <div className="form-grid">
+                <label>
+                  风格提示 (prompt_style)
+                  <textarea
+                    className="note-editor"
+                    value={aiConfigDraft.prompt_style ?? ''}
+                    onChange={(e) =>
+                      setAiConfigDraft((prev) => (prev ? { ...prev, prompt_style: e.target.value } : prev))
+                    }
+                  />
+                </label>
+                <label>
+                  优势提示 (prompt_strength)
+                  <textarea
+                    className="note-editor"
+                    value={aiConfigDraft.prompt_strength ?? ''}
+                    onChange={(e) =>
+                      setAiConfigDraft((prev) => (prev ? { ...prev, prompt_strength: e.target.value } : prev))
+                    }
+                  />
+                </label>
+                <label>
+                  风险提示 (prompt_risk)
+                  <textarea
+                    className="note-editor"
+                    value={aiConfigDraft.prompt_risk ?? ''}
+                    onChange={(e) =>
+                      setAiConfigDraft((prev) => (prev ? { ...prev, prompt_risk: e.target.value } : prev))
+                    }
+                  />
+                </label>
+                <label>
+                  建议提示 (prompt_suggestion)
+                  <textarea
+                    className="note-editor"
+                    value={aiConfigDraft.prompt_suggestion ?? ''}
+                    onChange={(e) =>
+                      setAiConfigDraft((prev) => (prev ? { ...prev, prompt_suggestion: e.target.value } : prev))
+                    }
+                  />
+                </label>
+              </div>
+              <div className="button-row">
+                <button className="btn primary" onClick={saveAiConfig} disabled={savingAiConfig}>
+                  {savingAiConfig ? '保存中...' : '保存配置'}
+                </button>
+                <button className="btn secondary" onClick={() => refetchAiConfig()}>
+                  刷新
+                </button>
+              </div>
+            </>
+          )}
         </section>
       )}
 

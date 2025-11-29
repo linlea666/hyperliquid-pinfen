@@ -13,6 +13,9 @@ export default function LeaderboardDetail() {
     const parsed = Number(id);
     return Number.isNaN(parsed) ? null : parsed;
   }, [id]);
+  const [sortKey, setSortKey] = useState<'rank' | 'win_rate' | 'total_pnl' | 'return_7d' | 'return_30d'>('rank');
+  const [page, setPage] = useState(1);
+  const [pageSize, setPageSize] = useState(20);
 
   const { data, isLoading, error } = useQuery<LeaderboardResultResponse>({
     queryKey: ['leaderboard-detail-page', numericId],
@@ -57,10 +60,6 @@ export default function LeaderboardDetail() {
   }
 
   const lb = data.leaderboard;
-
-  const [sortKey, setSortKey] = useState<'rank' | 'win_rate' | 'total_pnl' | 'return_7d' | 'return_30d'>('rank');
-  const [page, setPage] = useState(1);
-  const [pageSize, setPageSize] = useState(20);
 
   const formatWinRate = (val?: number | string) => {
     if (val === undefined || val === null) return '--';

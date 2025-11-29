@@ -407,3 +407,19 @@ export interface ProcessingBatchResponse {
   enqueued: number;
   skipped: number;
 }
+
+export interface AIConfigResponse {
+  is_enabled: boolean;
+  provider: string;
+  api_key?: string | null;
+  model: string;
+  base_url?: string | null;
+  max_tokens: number;
+  temperature: number;
+  rate_limit_per_minute: number;
+  cooldown_minutes: number;
+  prompt_style?: string | null;
+  prompt_strength?: string | null;
+  prompt_risk?: string | null;
+  prompt_suggestion?: string | null;
+}

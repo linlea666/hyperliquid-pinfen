@@ -141,6 +141,7 @@ def processing_summary():
         batch_estimate_seconds=data["batch_estimate_seconds"],
         scope=data["scope"],
         last_failed=[map_log(log) for log in data["failed_logs"]],
+        ai_enabled=data.get("ai_enabled", True),
     )
 
 

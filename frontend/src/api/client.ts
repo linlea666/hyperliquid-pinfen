@@ -59,7 +59,7 @@ export async function apiPut<T>(path: string, body?: Record<string, any>): Promi
   return res.json();
 }
 
-export async function apiDelete(path: string): Promise<void> {
+export async function apiDelete<T = void>(path: string): Promise<T> {
   const res = await fetch(`${API_BASE}${path}`, {
     method: 'DELETE',
     headers: authHeaders(),
@@ -68,6 +68,18 @@ export async function apiDelete(path: string): Promise<void> {
     const error: any = new Error(`请求失败：${res.statusText}`);
     error.status = res.status;
     throw error;
+  }
+  if (res.status === 204) {
+    return undefined as T;
+  }
+  const text = await res.text();
+  if (!text) {
+    return undefined as T;
+  }
+  try {
+    return JSON.parse(text) as T;
+  } catch {
+    return undefined as T;
   }
 }
 

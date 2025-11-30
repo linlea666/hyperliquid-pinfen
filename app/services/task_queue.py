@@ -45,6 +45,9 @@ def enqueue_wallet_score(address: str, scheduled_by: str = "pipeline", force: bo
 
 
 def enqueue_wallet_ai(address: str, scheduled_by: str = "pipeline", force: bool = False) -> Optional[str]:
+    if not ai_service.get_ai_config().is_enabled:
+        logger.info("AI disabled, skip enqueue", extra={"address": address})
+        return None
     try:
         log_id = processing.prepare_stage(address, "ai", scheduled_by=scheduled_by, force=force)
     except ValueError:
@@ -110,6 +113,11 @@ def run_wallet_score(address: str, log_id: int | None = None, scheduled_by: str 
 
 
 def run_wallet_ai(address: str, log_id: int | None = None, scheduled_by: str = "system") -> Dict[str, Any]:
+    if not ai_service.get_ai_config().is_enabled:
+        logger.info("AI disabled, skip wallet AI run", extra={"address": address})
+        if log_id is not None:
+            processing.mark_stage_success(log_id, {"skipped": True})
+        return {"analysis_id": None}
     if log_id is None:
         log_id = processing.prepare_stage(address, "ai", scheduled_by=scheduled_by, force=True)
     processing.mark_stage_running(log_id)

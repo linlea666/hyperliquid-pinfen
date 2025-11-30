@@ -98,6 +98,9 @@ export interface WalletSummary {
     level: string;
   };
   ledger_summary?: LedgerSummary;
+  is_followed?: boolean;
+  follow_note?: string | null;
+  ai_enabled?: boolean;
 }
 
 export interface WalletListResponse {
@@ -107,6 +110,12 @@ export interface WalletListResponse {
 
 export interface WalletNoteResponse {
   address: string;
+  note?: string | null;
+}
+
+export interface WalletFollowResponse {
+  address: string;
+  is_followed: boolean;
   note?: string | null;
 }
 
@@ -338,6 +347,7 @@ export interface ProcessingSummaryResponse {
   batch_estimate_seconds: number;
   scope: ProcessingScopeInfo;
   last_failed: ProcessingLog[];
+  ai_enabled: boolean;
 }
 
 export interface ScoringIndicatorConfig {

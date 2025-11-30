@@ -4,6 +4,10 @@ import { useNavigate } from 'react-router-dom';
 import { apiGet } from '../api/client';
 import type { TagResponse, WalletListResponse, WalletSummary } from '../types';
 
+interface WalletListProps {
+  followedOnly?: boolean;
+}
+
 const PAGE_SIZE = 20;
 const PERIOD_OPTIONS = [
   { label: '近1天', value: '1d' },
@@ -29,7 +33,7 @@ const AI_SORT_FIELDS = [
   { label: 'AI推荐比例', value: 'ai_follow_ratio' },
 ];
 
-export default function WalletList() {
+function WalletListView({ followedOnly = false }: WalletListProps) {
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
   const [page, setPage] = useState(0);
@@ -54,7 +58,7 @@ export default function WalletList() {
   const sortOptions = sortMode === 'metric' ? METRIC_SORT_FIELDS : sortMode === 'portfolio' ? PORTFOLIO_SORT_FIELDS : AI_SORT_FIELDS;
 
   const { data, isFetching, error } = useQuery<WalletListResponse>({
-    queryKey: ['wallets', { search, status, page, period, sortField, sortOrder, tagFilter }],
+    queryKey: ['wallets', { search, status, page, period, sortField, sortOrder, tagFilter, followedOnly }],
     queryFn: () =>
       apiGet<WalletListResponse>('/wallets', {
         search: search || undefined,
@@ -65,6 +69,7 @@ export default function WalletList() {
         sort_order: sortOrder,
         limit: PAGE_SIZE,
         offset: page * PAGE_SIZE,
+        followed: followedOnly || undefined,
       }),
   });
 
@@ -93,9 +98,15 @@ export default function WalletList() {
     <div className="page">
       <section className="card">
         <div className="header-actions">
-          <button className="btn primary" onClick={() => navigate('/wallets/import')}>
-            批量导入
-          </button>
+          {followedOnly ? (
+            <button className="btn secondary" onClick={() => navigate('/wallets')}>
+              返回全部
+            </button>
+          ) : (
+            <button className="btn primary" onClick={() => navigate('/wallets/import')}>
+              批量导入
+            </button>
+          )}
         </div>
         <div className="filters stacked">
           <div className="filter-row">
@@ -204,10 +215,11 @@ export default function WalletList() {
                 <th>胜率</th>
                 <th>累计盈亏</th>
                 <th>30日收益率</th>
-              <th>30日回撤</th>
-              <th>AI 推荐</th>
-              <th>操作</th>
-            </tr>
+                <th>30日回撤</th>
+                <th>AI 推荐</th>
+                <th>关注</th>
+                <th>操作</th>
+              </tr>
             </thead>
             <tbody>
               {wallets.map((wallet) => (
@@ -269,6 +281,7 @@ export default function WalletList() {
                       <span className="muted">未生成</span>
                     )}
                   </td>
+                  <td>{wallet.is_followed ? '★' : ''}</td>
                   <td>
                     <button className="btn small" onClick={() => navigate(`/wallets/${wallet.address}`)}>
                       查看
@@ -278,7 +291,7 @@ export default function WalletList() {
               ))}
               {!wallets.length && (
                 <tr>
-                  <td colSpan={9} className="muted">
+                  <td colSpan={12} className="muted">
                     暂无数据，先去
                     <button className="btn small" style={{ marginLeft: '0.5rem' }} onClick={() => navigate('/wallets/import')}>
                       批量导入

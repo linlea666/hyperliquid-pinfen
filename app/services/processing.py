@@ -7,7 +7,7 @@ from sqlalchemy import asc, desc, func, select, or_, case
 
 from app.core.database import session_scope
 from app.models import Wallet, WalletProcessingLog, WalletScore, WalletMetric
-from app.services import processing_config
+from app.services import processing_config, ai as ai_service
 
 STAGE_META = {
     "sync": {
@@ -57,6 +57,8 @@ def prepare_stage(
 ) -> int:
     """Create a pending processing log and mark wallet stage as pending."""
     meta = _get_stage_meta(stage)
+    if stage == "ai" and not ai_service.get_ai_config().is_enabled:
+        raise ValueError("AI 分析已禁用")
     with session_scope() as session:
         wallet = session.execute(select(Wallet).where(Wallet.address == address)).scalar_one_or_none()
         if not wallet:
@@ -230,6 +232,7 @@ def _scope_description(cfg: dict) -> tuple[str, dict]:
 def summary(failed_limit: int = 5) -> dict:
     """Aggregate stage counts & recent failures for operations dashboard."""
     cfg = processing_config.get_processing_config()
+    ai_enabled = ai_service.get_ai_config().is_enabled
     with session_scope() as session:
         stage_stats = []
         for stage, meta in STAGE_META.items():
@@ -239,6 +242,8 @@ def summary(failed_limit: int = 5) -> dict:
             for status_value, count in rows:
                 key = status_value or "unknown"
                 counts[key] = count
+            if stage == "ai" and not ai_enabled:
+                continue
             stage_stats.append({"stage": stage, "counts": counts})
 
         pending_rescore = session.execute(
@@ -269,6 +274,7 @@ def summary(failed_limit: int = 5) -> dict:
         "batch_estimate_seconds": estimate_seconds,
         "scope": scope_payload,
         "failed_logs": failed_logs,
+        "ai_enabled": ai_enabled,
     }
 
 

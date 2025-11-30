@@ -149,6 +149,7 @@ class WalletSummary(BaseModel):
     ai_analysis: Optional[dict] = None
     is_followed: bool = False
     ai_enabled: Optional[bool] = None
+    follow_note: Optional[str] = None
 
 
 class WalletListResponse(BaseModel):

@@ -5,7 +5,7 @@ import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'rec
 import MetricCard from '../components/MetricCard';
 import { apiGet, apiPost } from '../api/client';
 import { showToast } from '../utils/toast';
-import type { LatestRecords, WalletSummary, WalletNoteResponse, PaginatedResponse } from '../types';
+import type { LatestRecords, WalletSummary, WalletNoteResponse, PaginatedResponse, WalletFollowResponse } from '../types';
 import type { AIAnalysisResponse } from '../types';
 
 const PERIOD_OPTIONS = [
@@ -27,6 +27,8 @@ export default function WalletDetail() {
   const [ledgerPage, setLedgerPage] = useState(0);
   const [orderPage, setOrderPage] = useState(0);
   const [historyTab, setHistoryTab] = useState<'trades' | 'ledger' | 'orders'>('trades');
+  const [isFollowed, setIsFollowed] = useState(false);
+  const [followLoading, setFollowLoading] = useState(false);
   const [aiGenerating, setAIGenerating] = useState(false);
   const PAGE_SIZE = 20;
 
@@ -42,7 +44,11 @@ export default function WalletDetail() {
     enabled: Boolean(address),
   });
 
-  const { data: aiAnalysis, refetch: refetchAI, isFetching: aiLoading } = useQuery<AIAnalysisResponse | undefined>({
+  const {
+    data: aiAnalysis,
+    refetch: refetchAI,
+    isFetching: aiLoading,
+  } = useQuery<AIAnalysisResponse | undefined>({
     queryKey: ['wallet-ai', address],
     queryFn: async () => {
       try {
@@ -51,7 +57,7 @@ export default function WalletDetail() {
         return undefined;
       }
     },
-    enabled: Boolean(address),
+    enabled: Boolean(address) && (detail?.ai_enabled ?? true),
     retry: 0,
   });
   const emptyPage: PaginatedResponse<any> = { items: [], total: 0 };
@@ -84,6 +90,7 @@ export default function WalletDetail() {
   });
   useEffect(() => {
     setNoteDraft(detail?.note ?? '');
+    setIsFollowed(Boolean(detail?.is_followed));
   }, [detail?.note]);
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }),
@@ -136,6 +143,7 @@ export default function WalletDetail() {
   const portfolioWeek = portfolioStats.week;
   const portfolioMonth = portfolioStats.month;
   const portfolioAll = portfolioStats.allTime;
+  const aiEnabled = detail?.ai_enabled !== false;
   const trades: any[] = tradesData?.items ?? [];
   const tradeTotal = tradesData?.total ?? trades.length;
   const tradeTotalPages = Math.max(1, Math.ceil(tradeTotal / PAGE_SIZE));
@@ -174,8 +182,33 @@ export default function WalletDetail() {
     return <div className="card error">加载失败：{(error as Error)?.message ?? '钱包不存在'}</div>;
   }
 
+  const handleFollowToggle = async () => {
+    if (!address) return;
+    try {
+      setFollowLoading(true);
+      let resp: WalletFollowResponse | undefined;
+      if (isFollowed) {
+        resp = await apiDelete<WalletFollowResponse>(`/wallets/${address}/follow`);
+      } else {
+        resp = await apiPost<WalletFollowResponse>(`/wallets/${address}/follow`, {});
+      }
+      if (resp) {
+        setIsFollowed(resp.is_followed);
+        showToast(resp.is_followed ? '已关注该钱包' : '已取消关注', 'success');
+      }
+    } catch (err: any) {
+      showToast(err?.message ?? '操作失败', 'error');
+    } finally {
+      setFollowLoading(false);
+    }
+  };
+
   const handleGenerateAI = async () => {
     if (!address) return;
+    if (!aiEnabled) {
+      showToast('AI 分析已关闭', 'error');
+      return;
+    }
     try {
       setAIGenerating(true);
       await apiPost(`/wallets/${address}/ai`);
@@ -202,6 +235,9 @@ export default function WalletDetail() {
             }}
           >
             {copied ? '已复制' : '复制地址'}
+          </button>
+          <button className="btn small" onClick={handleFollowToggle} disabled={followLoading}>
+            {followLoading ? '处理中...' : isFollowed ? '取消关注' : '关注钱包'}
           </button>
         </div>
         <p className="muted">
@@ -344,6 +380,14 @@ export default function WalletDetail() {
         )}
       </section>
 
+      {!aiEnabled && (
+        <section className="card mt">
+          <h3>AI 分析</h3>
+          <p className="muted">AI 分析功能已在后台关闭，当前仅展示系统评分和官方指标。</p>
+        </section>
+      )}
+
+      {aiEnabled && (
       <section className="card mt">
         <div className="header-row">
           <h3>AI 分析</h3>
@@ -380,6 +424,7 @@ export default function WalletDetail() {
           <p className="muted">尚未生成 AI 分析，点击上方按钮即可创建。</p>
         )}
       </section>
+      )}
 
       {ledgerSummary && (
         <section className="card mt">

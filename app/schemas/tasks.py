@@ -67,6 +67,7 @@ class ProcessingSummaryResponse(BaseModel):
     batch_estimate_seconds: int
     scope: ProcessingScopeSummary
     last_failed: List[ProcessingLogResponse]
+    ai_enabled: bool = True
 
 
 class AILogResponse(BaseModel):

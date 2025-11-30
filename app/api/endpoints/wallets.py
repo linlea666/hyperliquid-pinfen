@@ -108,6 +108,7 @@ def wallets_list(
     sort_order: str = Query("desc", pattern="^(asc|desc)$"),
     limit: int = Query(20, ge=1, le=100),
     offset: int = Query(0, ge=0),
+    followed: bool = Query(False, description="仅显示已关注"),
 ):
     return wallets_service.list_wallets(
         limit=limit,
@@ -118,6 +119,7 @@ def wallets_list(
         period=period,
         sort_key=sort_key,
         sort_order=sort_order,
+        followed_only=followed,
     )
 
 

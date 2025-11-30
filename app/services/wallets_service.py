@@ -132,6 +132,8 @@ def list_wallets(
 
     with session_scope() as session:
         count_query = select(func.count()).select_from(Wallet)
+        if followed_only:
+            count_query = count_query.join(WalletFollow, Wallet.address == WalletFollow.wallet_address)
         period_cutoff = _period_cutoff_ms(normalized_period)
         metric_latest = (
             select(
@@ -355,6 +357,7 @@ def list_wallets(
             "metric": metric_dict,
             "metric_period": normalized_period if metric_dict else None,
             "is_followed": bool(metric_row.get("follow_wallet")),
+            "follow_note": metric_row.get("follow_note"),
             "ai_enabled": ai_available,
         }
         portfolio_stats = portfolio_map.get(wallet.address)
@@ -407,11 +410,8 @@ def get_wallet_detail(address: str) -> Optional[dict]:
         tags_map = _tags_map(session, [address])
         portfolio_stats = _portfolio_map(session, [address]).get(address)
         ledger_summary = _ledger_summary(session, address)
-        is_followed = (
-            session.execute(
-                select(func.count()).select_from(WalletFollow).where(WalletFollow.wallet_address == address)
-            ).scalar_one()
-            > 0
+        follow_entry = (
+            session.execute(select(WalletFollow).where(WalletFollow.wallet_address == address)).scalars().first()
         )
     raw_tags = tags_map.get(address) or (json.loads(wallet.tags) if wallet.tags else [])
     normalized_tags = []
@@ -465,7 +465,8 @@ def get_wallet_detail(address: str) -> Optional[dict]:
         data["ai_analysis"] = ai_dict
     if ledger_summary:
         data["ledger_summary"] = ledger_summary
-    data["is_followed"] = is_followed
+    data["is_followed"] = bool(follow_entry)
+    data["follow_note"] = follow_entry.note if follow_entry else None
     data["ai_enabled"] = ai_service.get_ai_config().is_enabled
     return data
 

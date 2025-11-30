@@ -139,6 +139,7 @@ export default function AdminPanel() {
   });
   const [aiConfigDraft, setAiConfigDraft] = useState<AIConfigResponse | null>(null);
   const [savingAiConfig, setSavingAiConfig] = useState(false);
+  const [aiConfigError, setAiConfigError] = useState<string | null>(null);
   const indicatorMeta: Record<string, string> = {
     total_pnl: '单位：USDC，统计周期内的累计收益额',
     avg_pnl: '单位：USDC/笔，单笔平均盈亏',
@@ -492,15 +493,32 @@ export default function AdminPanel() {
     if (!aiConfigDraft) return;
     try {
       setSavingAiConfig(true);
+      setAiConfigError(null);
+      if (
+        aiConfigDraft.is_enabled &&
+        (!aiConfigDraft.provider || !aiConfigDraft.model || !aiConfigDraft.api_key)
+      ) {
+        setAiConfigError('启用 AI 时需要填写 Provider、模型和 API Key');
+        return;
+      }
       await apiPost('/ai/config', aiConfigDraft);
       showToast('AI 配置已保存', 'success');
       await refetchAiConfig();
     } catch (err: any) {
-      showToast(err?.message ?? '保存失败', 'error');
+      const message = err?.message ?? '保存失败';
+      setAiConfigError(message);
+      showToast(message, 'error');
     } finally {
       setSavingAiConfig(false);
     }
   };
+
+  useEffect(() => {
+    if (aiConfigResp) {
+      setAiConfigDraft(aiConfigResp);
+      setAiConfigError(null);
+    }
+  }, [aiConfigResp]);
 
   return (
     <div className="page">
@@ -1291,6 +1309,13 @@ export default function AdminPanel() {
             <p className="muted">正在加载 AI 配置...</p>
           ) : (
             <>
+              <p className="muted">
+                当前状态：{aiConfigDraft.is_enabled ? '已启用，所有新钱包会尝试生成 AI 分析' : '已关闭，生产任务将跳过 AI 阶段，可随时重新开启'}
+              </p>
+              {aiConfigError && <p className="error">{aiConfigError}</p>}
+              {aiConfigDraft.is_enabled && (!aiConfigDraft.provider || !aiConfigDraft.model || !aiConfigDraft.api_key) && (
+                <p className="error">启用 AI 需要填写 Provider / 模型 / API Key。</p>
+              )}
               <div className="form-grid">
                 <label className="checkbox-row inline">
                   <input
@@ -1416,7 +1441,11 @@ export default function AdminPanel() {
                 </label>
               </div>
               <div className="button-row">
-                <button className="btn primary" onClick={saveAiConfig} disabled={savingAiConfig}>
+                <button
+                  className="btn primary"
+                  onClick={saveAiConfig}
+                  disabled={savingAiConfig || (aiConfigDraft.is_enabled && (!aiConfigDraft.provider || !aiConfigDraft.model || !aiConfigDraft.api_key))}
+                >
                   {savingAiConfig ? '保存中...' : '保存配置'}
                 </button>
                 <button className="btn secondary" onClick={() => refetchAiConfig()}>

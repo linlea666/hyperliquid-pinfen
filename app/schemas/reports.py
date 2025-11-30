@@ -10,3 +10,5 @@ class OperationsReport(BaseModel):
     tasks_failed: int
     notifications_sent: int
     last_sync: str | None
+    followed_wallets: int
+    followed_today: int

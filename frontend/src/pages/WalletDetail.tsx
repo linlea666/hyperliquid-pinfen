@@ -3,7 +3,7 @@ import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import MetricCard from '../components/MetricCard';
-import { apiGet, apiPost } from '../api/client';
+import { apiGet, apiPost, apiDelete } from '../api/client';
 import { showToast } from '../utils/toast';
 import type { LatestRecords, WalletSummary, WalletNoteResponse, PaginatedResponse, WalletFollowResponse } from '../types';
 import type { AIAnalysisResponse } from '../types';
@@ -32,7 +32,7 @@ export default function WalletDetail() {
   const [aiGenerating, setAIGenerating] = useState(false);
   const PAGE_SIZE = 20;
 
-  const { data: detail, isLoading, error } = useQuery<WalletSummary>({
+  const { data: detail, isLoading, error, refetch: refetchDetail } = useQuery<WalletSummary>({
     queryKey: ['wallet', address],
     queryFn: () => apiGet<WalletSummary>(`/wallets/${address}`),
     enabled: Boolean(address),
@@ -91,7 +91,7 @@ export default function WalletDetail() {
   useEffect(() => {
     setNoteDraft(detail?.note ?? '');
     setIsFollowed(Boolean(detail?.is_followed));
-  }, [detail?.note]);
+  }, [detail?.note, detail?.is_followed]);
   const currencyFormatter = useMemo(
     () => new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 2 }),
     []
@@ -195,6 +195,7 @@ export default function WalletDetail() {
       if (resp) {
         setIsFollowed(resp.is_followed);
         showToast(resp.is_followed ? '已关注该钱包' : '已取消关注', 'success');
+        await refetchDetail();
       }
     } catch (err: any) {
       showToast(err?.message ?? '操作失败', 'error');

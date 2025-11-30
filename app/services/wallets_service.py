@@ -515,6 +515,12 @@ def get_wallet_overview() -> dict:
         last_sync = (
             session.execute(select(func.max(Wallet.last_synced_at)).select_from(Wallet)).scalar_one()
         )
+        follow_total = session.execute(select(func.count()).select_from(WalletFollow)).scalar_one()
+        follow_today = session.execute(
+            select(func.count())
+            .select_from(WalletFollow)
+            .where(WalletFollow.created_at >= datetime.utcnow() - timedelta(days=1))
+        ).scalar_one()
     return {
         "total_wallets": total_wallets,
         "synced_wallets": synced_wallets,
@@ -524,6 +530,8 @@ def get_wallet_overview() -> dict:
         "ledger_events": ledger_events,
         "fills": fills,
         "last_sync": last_sync.isoformat() if last_sync else None,
+        "followed_wallets": follow_total,
+        "followed_today": follow_today,
     }
 
 

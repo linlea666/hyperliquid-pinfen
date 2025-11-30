@@ -103,9 +103,14 @@ function WalletListView({ followedOnly = false }: WalletListProps) {
               返回全部
             </button>
           ) : (
-            <button className="btn primary" onClick={() => navigate('/wallets/import')}>
-              批量导入
-            </button>
+            <>
+              <button className="btn secondary" onClick={() => navigate('/wallets/following')}>
+                我的关注
+              </button>
+              <button className="btn primary" onClick={() => navigate('/wallets/import')}>
+                批量导入
+              </button>
+            </>
           )}
         </div>
         <div className="filters stacked">
@@ -281,7 +286,7 @@ function WalletListView({ followedOnly = false }: WalletListProps) {
                       <span className="muted">未生成</span>
                     )}
                   </td>
-                  <td>{wallet.is_followed ? '★' : ''}</td>
+                  <td>{wallet.is_followed ? '★' : followedOnly ? <span className="muted">—</span> : ''}</td>
                   <td>
                     <button className="btn small" onClick={() => navigate(`/wallets/${wallet.address}`)}>
                       查看
@@ -326,4 +331,12 @@ function WalletListView({ followedOnly = false }: WalletListProps) {
       </section>
     </div>
   );
+}
+
+export default function WalletList() {
+  return <WalletListView />;
+}
+
+export function FollowedWalletList() {
+  return <WalletListView followedOnly />;
 }

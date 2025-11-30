@@ -254,6 +254,8 @@ def operations_report():
         tasks_failed=task_stats["failed"],
         notifications_sent=notifications_sent,
         last_sync=overview["last_sync"],
+        followed_wallets=overview["followed_wallets"],
+        followed_today=overview["followed_today"],
     )
 
 

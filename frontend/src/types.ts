@@ -239,7 +239,9 @@ export interface OperationsReport {
   tasks_running: number;
   tasks_failed: number;
   notifications_sent: number;
-  last_sync?: string;
+  last_sync?: string | null;
+  followed_wallets: number;
+  followed_today: number;
 }
 
 export interface Schedule {

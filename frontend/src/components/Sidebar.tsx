@@ -3,6 +3,7 @@ import { NavLink } from 'react-router-dom';
 const links = [
   { path: '/dashboard', label: '仪表盘' },
   { path: '/wallets', label: '钱包列表' },
+  { path: '/wallets/following', label: '我的关注' },
   { path: '/wallets/import', label: '钱包导入' },
   { path: '/leaderboards', label: '榜单' },
   { path: '/operations', label: '运营监控' },

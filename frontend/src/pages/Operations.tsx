@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { apiGet, apiPost } from '../api/client';
 import { showToast } from '../utils/toast';
@@ -115,26 +115,37 @@ export default function Operations() {
 
   const scopeText = processingSummary?.scope?.description ?? '--';
 
+  const visibleStageStats = useMemo(() => {
+    if (!processingSummary) return [];
+    return processingSummary.stages.filter((stage) => processingSummary.ai_enabled || stage.stage !== 'ai');
+  }, [processingSummary]);
+
   const stageProgress = useMemo(() => {
     if (!processingSummary) return [];
-    return processingSummary.stages.map((stage) => {
-      const successKey = STAGE_SUCCESS_KEYS[stage.stage] || 'completed';
-      const counts = stage.counts || {};
-      const success = counts[successKey] ?? 0;
-      const pending = counts.pending ?? 0;
-      const running = counts.running ?? 0;
-      const total = success + pending + running;
-      const percent = total > 0 ? Math.round((success / total) * 100) : 0;
-      return {
-        key: stage.stage,
-        label: STAGE_LABELS[stage.stage] || stage.stage,
-        success,
-        pending: pending + running,
-        percent,
-        total,
-      };
-    });
-  }, [processingSummary]);
+    return visibleStageStats.map((stage) => {
+        const successKey = STAGE_SUCCESS_KEYS[stage.stage] || 'completed';
+        const counts = stage.counts || {};
+        const success = counts[successKey] ?? 0;
+        const pending = counts.pending ?? 0;
+        const running = counts.running ?? 0;
+        const total = success + pending + running;
+        const percent = total > 0 ? Math.round((success / total) * 100) : 0;
+        return {
+          key: stage.stage,
+          label: STAGE_LABELS[stage.stage] || stage.stage,
+          success,
+          pending: pending + running,
+          percent,
+          total,
+        };
+      });
+  }, [processingSummary, visibleStageStats]);
+
+  useEffect(() => {
+    if (stageFilter === 'ai' && processingSummary && !processingSummary.ai_enabled) {
+      setStageFilter('all');
+    }
+  }, [processingSummary?.ai_enabled, stageFilter]);
 
   const triggerBatch = async (force = false) => {
     if (!processingConfig) return;
@@ -199,6 +210,13 @@ export default function Operations() {
               <div className="metric-card">
                 <p className="metric-title">通知已发送</p>
                 <p className="metric-value">{report?.notifications_sent ?? '--'}</p>
+              </div>
+            </div>
+            <div className="grid-4 mt">
+              <div className="metric-card">
+                <p className="metric-title">关注的钱包</p>
+                <p className="metric-value">{report?.followed_wallets ?? '--'}</p>
+                <p className="metric-desc">今日新增 {report?.followed_today ?? 0}</p>
               </div>
             </div>
             <p className="muted">最近同步时间：{report?.last_sync ? new Date(report.last_sync).toLocaleString() : '无'}</p>
@@ -319,20 +337,20 @@ export default function Operations() {
                   </tr>
                 </thead>
                 <tbody>
-                  {processingSummary?.stages.map((stage) => {
-                    const successKey =
-                      stage.stage === 'sync' ? 'synced' : stage.stage === 'score' ? 'scored' : 'completed';
-                    return (
-                      <tr key={stage.stage}>
-                        <td>{stage.stage}</td>
-                        <td>{stage.counts.pending ?? 0}</td>
-                        <td>{stage.counts.running ?? 0}</td>
-                        <td>{stage.counts[successKey] ?? 0}</td>
-                        <td>{stage.counts.failed ?? 0}</td>
-                      </tr>
-                    );
-                  })}
-                  {!processingSummary?.stages.length && (
+                  {visibleStageStats.map((stage) => {
+                      const successKey =
+                        stage.stage === 'sync' ? 'synced' : stage.stage === 'score' ? 'scored' : 'completed';
+                      return (
+                        <tr key={stage.stage}>
+                          <td>{stage.stage}</td>
+                          <td>{stage.counts.pending ?? 0}</td>
+                          <td>{stage.counts.running ?? 0}</td>
+                          <td>{stage.counts[successKey] ?? 0}</td>
+                          <td>{stage.counts.failed ?? 0}</td>
+                        </tr>
+                      );
+                    })}
+                  {!visibleStageStats.length && (
                     <tr>
                       <td colSpan={5} className="muted">
                         暂无统计
@@ -366,7 +384,7 @@ export default function Operations() {
                 <option value="all">全部阶段</option>
                 <option value="sync">同步</option>
                 <option value="score">评分</option>
-                <option value="ai">AI 分析</option>
+                {processingSummary?.ai_enabled && <option value="ai">AI 分析</option>}
               </select>
             </div>
             <div className="table-wrapper">

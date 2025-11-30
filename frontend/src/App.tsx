@@ -4,7 +4,7 @@ import './index.css';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import Dashboard from './pages/Dashboard';
-import WalletList from './pages/WalletList';
+import WalletList, { FollowedWalletList } from './pages/WalletList';
 import WalletDetail from './pages/WalletDetail';
 import Leaderboards from './pages/Leaderboards';
 import LeaderboardDetail from './pages/LeaderboardDetail';
@@ -42,6 +42,7 @@ function App() {
           <Route path="/" element={<Navigate to="/dashboard" replace />} />
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/wallets" element={<WalletList />} />
+          <Route path="/wallets/following" element={<FollowedWalletList />} />
           <Route path="/wallets/:address" element={<WalletDetail />} />
           <Route path="/wallets/import" element={<WalletImport />} />
           <Route path="/leaderboards" element={<Leaderboards />} />

@@ -105,6 +105,11 @@ export default function WalletDetail() {
     }
     return fraction ? `${(num * 100).toFixed(1)}%` : `${num.toFixed(1)}%`;
   };
+  const formatSignedCurrency = (value: number | null) => {
+    if (value === null || Number.isNaN(value)) return '--';
+    const sign = value > 0 ? '+' : value < 0 ? '-' : '';
+    return `${sign}${currencyFormatter.format(Math.abs(value))}`;
+  };
 
   const handleSaveNote = async () => {
     if (!address) return;
@@ -146,6 +151,12 @@ export default function WalletDetail() {
   const aiEnabled = detail?.ai_enabled !== false;
   const trades: any[] = tradesData?.items ?? [];
   const tradeTotal = tradesData?.total ?? trades.length;
+  const tradeSummary = (tradesData?.summary as { total_pnl?: string; win_trades?: number; loss_trades?: number; break_even_trades?: number } | undefined) ?? null;
+  const netTradePnl = tradeSummary ? Number(tradeSummary.total_pnl ?? 0) : null;
+  const summaryTotalTrades = tradeSummary
+    ? (tradeSummary.win_trades ?? 0) + (tradeSummary.loss_trades ?? 0) + (tradeSummary.break_even_trades ?? 0)
+    : tradeTotal;
+  const summaryWinRate = summaryTotalTrades > 0 && tradeSummary ? (tradeSummary.win_trades ?? 0) / summaryTotalTrades : null;
   const tradeTotalPages = Math.max(1, Math.ceil(tradeTotal / PAGE_SIZE));
   const ledgerItems: any[] = ledgerData?.items ?? [];
   const ledgerTotal = ledgerData?.total ?? ledgerItems.length;
@@ -378,6 +389,36 @@ export default function WalletDetail() {
           </div>
         ) : (
           <p className="muted">暂无该周期数据</p>
+        )}
+      </section>
+
+      <section className="card mt">
+        <h3>交易盈亏统计</h3>
+        {tradeSummary ? (
+          <div className="grid-4">
+            <MetricCard
+              title="累计成交盈亏"
+              value={formatSignedCurrency(netTradePnl)}
+              description="Closed PnL 合计"
+            />
+            <MetricCard
+              title="成交笔数"
+              value={summaryTotalTrades ?? '--'}
+              description={`胜 ${tradeSummary.win_trades ?? 0} · 负 ${tradeSummary.loss_trades ?? 0}`}
+            />
+            <MetricCard
+              title="胜率"
+              value={summaryWinRate != null ? `${(summaryWinRate * 100).toFixed(1)}%` : '--'}
+              description="基于全部成交"
+            />
+            <MetricCard
+              title="持平笔数"
+              value={tradeSummary.break_even_trades ?? 0}
+              description="盈亏为 0 的成交"
+            />
+          </div>
+        ) : (
+          <p className="muted">暂无交易统计</p>
         )}
       </section>
 

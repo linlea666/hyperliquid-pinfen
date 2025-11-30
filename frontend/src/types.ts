@@ -155,6 +155,7 @@ export interface LatestRecords {
 export interface PaginatedResponse<T> {
   items: T[];
   total: number;
+  summary?: Record<string, any>;
 }
 
 export interface LeaderboardResponse {

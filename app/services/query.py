@@ -1,6 +1,6 @@
 from datetime import datetime
 from decimal import Decimal
-from typing import Dict, List
+from typing import Dict, List, Optional
 
 from sqlalchemy import and_, desc, func, select
 
@@ -88,6 +88,28 @@ def latest_records(user: str, limit: int = 20) -> Dict[str, List[dict]]:
     }
 
 
+def _fill_summary_from_rows(rows: List[dict]) -> dict:
+    total_pnl = Decimal(0)
+    wins = 0
+    losses = 0
+    breakeven = 0
+    for row in rows:
+        value = Decimal(str(row.get("closed_pnl") or 0))
+        total_pnl += value
+        if value > 0:
+            wins += 1
+        elif value < 0:
+            losses += 1
+        else:
+            breakeven += 1
+    return {
+        "total_pnl": str(total_pnl),
+        "win_trades": wins,
+        "loss_trades": losses,
+        "break_even_trades": breakeven,
+    }
+
+
 def paged_events(model, user: str, start_time: int = None, end_time: int = None, limit: int = 50, offset: int = 0):
     conditions = [model.user == user]
     if start_time is not None:
@@ -95,12 +117,34 @@ def paged_events(model, user: str, start_time: int = None, end_time: int = None,
     if end_time is not None:
         conditions.append(model.time_ms <= end_time)
 
+    summary: Optional[dict] = None
+
     with session_scope() as session:
         query = select(model).where(and_(*conditions)).order_by(desc(model.time_ms)).offset(offset).limit(limit)
         rows = session.execute(query).scalars().all()
         total = session.execute(
             select(func.count()).select_from(select(model).where(and_(*conditions)).subquery())
         ).scalar_one()
+
+        if model is FillModel:
+            total_pnl = session.execute(
+                select(func.coalesce(func.sum(Fill.closed_pnl), 0)).where(and_(*conditions))
+            ).scalar_one()
+            wins = session.execute(
+                select(func.count()).select_from(Fill).where(and_(*conditions), Fill.closed_pnl > 0)
+            ).scalar_one()
+            losses = session.execute(
+                select(func.count()).select_from(Fill).where(and_(*conditions), Fill.closed_pnl < 0)
+            ).scalar_one()
+            breakeven = session.execute(
+                select(func.count()).select_from(Fill).where(and_(*conditions), Fill.closed_pnl == 0)
+            ).scalar_one()
+            summary = {
+                "total_pnl": str(total_pnl or 0),
+                "win_trades": int(wins or 0),
+                "loss_trades": int(losses or 0),
+                "break_even_trades": int(breakeven or 0),
+            }
 
     def model_to_dict(obj):
         data = obj.__dict__.copy()
@@ -119,4 +163,12 @@ def paged_events(model, user: str, start_time: int = None, end_time: int = None,
             cached = local_cache.read_events(user, cache_kind, start_time=start_time, end_time=end_time)
             total = len(cached)
             items = cached[offset : offset + limit]
-    return {"items": items, "total": total}
+            if model is FillModel:
+                summary = _fill_summary_from_rows(cached)
+
+    if model is FillModel and summary is None:
+        summary = _fill_summary_from_rows(items)
+    result = {"items": items, "total": total}
+    if summary is not None:
+        result["summary"] = summary
+    return result

@@ -136,65 +136,6 @@ def wallet_overview():
     return wallets_service.get_wallet_overview()
 
 
-@router.get("/wallets/{address}", response_model=WalletDetailResponse, summary="钱包详情")
-def wallet_detail(address: str) -> WalletDetailResponse:
-    data = wallets_service.get_wallet_detail(address)
-    if not data:
-        raise HTTPException(status_code=404, detail="wallet not found")
-    return WalletDetailResponse(**data)
-
-
-@router.post("/wallets/{address}/note", response_model=WalletNoteResponse, dependencies=[Depends(get_current_user)])
-def wallet_update_note(address: str, payload: WalletNoteRequest) -> WalletNoteResponse:
-    note = wallets_service.update_wallet_note(address, payload.note)
-    if note is None and payload.note is not None:
-        raise HTTPException(status_code=404, detail="wallet not found")
-    return WalletNoteResponse(address=address, note=note)
-
-
-@router.post(
-    "/wallets/{address}/follow",
-    response_model=WalletFollowResponse,
-    dependencies=[Depends(get_current_user)],
-    summary="关注钱包",
-)
-def wallet_follow(address: str, payload: WalletFollowRequest | None = Body(None)) -> WalletFollowResponse:
-    result = wallets_service.set_wallet_follow(address, True, note=payload.note if payload else None)
-    if result is None:
-        raise HTTPException(status_code=404, detail="wallet not found")
-    return WalletFollowResponse(**result)
-
-
-@router.delete(
-    "/wallets/{address}/follow",
-    response_model=WalletFollowResponse,
-    dependencies=[Depends(get_current_user)],
-    summary="取消关注钱包",
-)
-def wallet_unfollow(address: str) -> WalletFollowResponse:
-    result = wallets_service.set_wallet_follow(address, False)
-    if result is None:
-        raise HTTPException(status_code=404, detail="wallet not found")
-    return WalletFollowResponse(**result)
-
-
-@router.get("/wallets/{address}/ai", response_model=AIAnalysisResponse, summary="获取钱包 AI 分析")
-def wallet_ai_detail(address: str) -> AIAnalysisResponse:
-    analysis = ai_service.latest_analysis(address)
-    if not analysis:
-        raise HTTPException(status_code=404, detail="暂无 AI 分析")
-    return AIAnalysisResponse(**ai_service.serialize_analysis(analysis))
-
-
-@router.post("/wallets/{address}/ai", response_model=AIAnalysisResponse, dependencies=[Depends(get_current_user)], summary="触发 AI 分析")
-def wallet_ai_generate(address: str) -> AIAnalysisResponse:
-    config = ai_service.get_ai_config()
-    if not config.is_enabled:
-        raise HTTPException(status_code=400, detail="AI 分析未开启")
-    analysis = ai_service.analyze_wallet(address)
-    return AIAnalysisResponse(**ai_service.serialize_analysis(analysis))
-
-
 @router.get("/wallets/ledger", summary="分页查询账本事件")
 def wallets_ledger(
     address: str,
@@ -282,6 +223,65 @@ def export_positions(address: str, limit: int = Query(1000, ge=1, le=5000)):
     data = query_service.paged_events(query_service.PositionModel, address, limit=limit, offset=0)
     headers = ["time_ms", "coin", "szi", "entry_px", "pos_value", "unrealized_pnl", "roe", "liq_px", "margin_used"]
     return StreamingResponse(_export_csv(data["items"], headers), media_type="text/csv")
+
+
+@router.get("/wallets/{address}", response_model=WalletDetailResponse, summary="钱包详情")
+def wallet_detail(address: str) -> WalletDetailResponse:
+    data = wallets_service.get_wallet_detail(address)
+    if not data:
+        raise HTTPException(status_code=404, detail="wallet not found")
+    return WalletDetailResponse(**data)
+
+
+@router.post("/wallets/{address}/note", response_model=WalletNoteResponse, dependencies=[Depends(get_current_user)])
+def wallet_update_note(address: str, payload: WalletNoteRequest) -> WalletNoteResponse:
+    note = wallets_service.update_wallet_note(address, payload.note)
+    if note is None and payload.note is not None:
+        raise HTTPException(status_code=404, detail="wallet not found")
+    return WalletNoteResponse(address=address, note=note)
+
+
+@router.post(
+    "/wallets/{address}/follow",
+    response_model=WalletFollowResponse,
+    dependencies=[Depends(get_current_user)],
+    summary="关注钱包",
+)
+def wallet_follow(address: str, payload: WalletFollowRequest | None = Body(None)) -> WalletFollowResponse:
+    result = wallets_service.set_wallet_follow(address, True, note=payload.note if payload else None)
+    if result is None:
+        raise HTTPException(status_code=404, detail="wallet not found")
+    return WalletFollowResponse(**result)
+
+
+@router.delete(
+    "/wallets/{address}/follow",
+    response_model=WalletFollowResponse,
+    dependencies=[Depends(get_current_user)],
+    summary="取消关注钱包",
+)
+def wallet_unfollow(address: str) -> WalletFollowResponse:
+    result = wallets_service.set_wallet_follow(address, False)
+    if result is None:
+        raise HTTPException(status_code=404, detail="wallet not found")
+    return WalletFollowResponse(**result)
+
+
+@router.get("/wallets/{address}/ai", response_model=AIAnalysisResponse, summary="获取钱包 AI 分析")
+def wallet_ai_detail(address: str) -> AIAnalysisResponse:
+    analysis = ai_service.latest_analysis(address)
+    if not analysis:
+        raise HTTPException(status_code=404, detail="暂无 AI 分析")
+    return AIAnalysisResponse(**ai_service.serialize_analysis(analysis))
+
+
+@router.post("/wallets/{address}/ai", response_model=AIAnalysisResponse, dependencies=[Depends(get_current_user)], summary="触发 AI 分析")
+def wallet_ai_generate(address: str) -> AIAnalysisResponse:
+    config = ai_service.get_ai_config()
+    if not config.is_enabled:
+        raise HTTPException(status_code=400, detail="AI 分析未开启")
+    analysis = ai_service.analyze_wallet(address)
+    return AIAnalysisResponse(**ai_service.serialize_analysis(analysis))
 
 
 @router.post(

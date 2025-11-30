@@ -6,6 +6,7 @@ from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
 from sqlalchemy import and_, asc, desc, func, select, case
+from sqlalchemy.orm import aliased
 
 from app.core.database import session_scope
 from app.models import (
@@ -131,9 +132,11 @@ def list_wallets(
         conditions.append(Wallet.tags.like(f'%"{tag}"%'))
 
     with session_scope() as session:
+        follow_count_alias = aliased(WalletFollow)
+        follow_alias = aliased(WalletFollow)
         count_query = select(func.count()).select_from(Wallet)
         if followed_only:
-            count_query = count_query.join(WalletFollow, Wallet.address == WalletFollow.wallet_address)
+            count_query = count_query.join(follow_count_alias, Wallet.address == follow_count_alias.wallet_address)
         period_cutoff = _period_cutoff_ms(normalized_period)
         metric_latest = (
             select(
@@ -262,13 +265,14 @@ def list_wallets(
                 *metric_columns,
                 *portfolio_columns,
                 *ai_columns,
-                WalletFollow.wallet_address.label("follow_wallet"),
-                WalletFollow.note.label("follow_note"),
+                follow_alias.wallet_address.label("follow_wallet"),
+                follow_alias.note.label("follow_note"),
             )
             .outerjoin(metric_view, Wallet.address == metric_view.c.metric_user)
             .outerjoin(portfolio_week, Wallet.address == portfolio_week.c.portfolio_week_user)
             .outerjoin(portfolio_month, Wallet.address == portfolio_month.c.portfolio_month_user)
             .outerjoin(ai_view, Wallet.address == ai_view.c.ai_view_user)
+            .outerjoin(follow_alias, Wallet.address == follow_alias.wallet_address)
             .offset(offset)
             .limit(limit)
         )
@@ -278,10 +282,7 @@ def list_wallets(
             data_query = data_query.where(predicate)
 
         if followed_only:
-            count_query = count_query.join(WalletFollow, Wallet.address == WalletFollow.wallet_address)
-            data_query = data_query.join(WalletFollow, Wallet.address == WalletFollow.wallet_address)
-        else:
-            data_query = data_query.outerjoin(WalletFollow, Wallet.address == WalletFollow.wallet_address)
+            data_query = data_query.where(follow_alias.wallet_address.is_not(None))
 
         sort_column = sort_key_map.get(sort_key or "")
         if sort_column is not None:

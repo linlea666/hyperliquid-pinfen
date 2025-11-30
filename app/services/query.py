@@ -6,12 +6,20 @@ from sqlalchemy import and_, desc, func, select
 
 from app.core.database import session_scope
 from app.models import FetchCursor, Fill, LedgerEvent, OrderHistory, PositionSnapshot
+from app.services import local_cache
 
 # Export model references for routing
 LedgerEventModel = LedgerEvent
 FillModel = Fill
 PositionModel = PositionSnapshot
 OrderModel = OrderHistory
+
+CACHE_KIND_MAP = {
+    LedgerEventModel: "ledger",
+    FillModel: "fills",
+    OrderModel: "orders",
+    PositionModel: "positions",
+}
 
 
 def get_cursors(user: str) -> Dict[str, int]:
@@ -66,11 +74,17 @@ def latest_records(user: str, limit: int = 20) -> Dict[str, List[dict]]:
                 data[key] = value.isoformat()
         return data
 
+    def with_cache(records: List, model, kind: str):
+        if records:
+            return [model_to_dict(o) for o in records]
+        cached = local_cache.read_events(user, kind)
+        return cached[:limit]
+
     return {
-        "ledger": [model_to_dict(o) for o in ledger],
-        "fills": [model_to_dict(o) for o in fills],
-        "positions": [model_to_dict(o) for o in positions],
-        "orders": [model_to_dict(o) for o in orders],
+        "ledger": with_cache(ledger, LedgerEventModel, "ledger"),
+        "fills": with_cache(fills, FillModel, "fills"),
+        "positions": with_cache(positions, PositionModel, "positions"),
+        "orders": with_cache(orders, OrderModel, "orders"),
     }
 
 
@@ -98,4 +112,11 @@ def paged_events(model, user: str, start_time: int = None, end_time: int = None,
                 data[key] = value.isoformat()
         return data
 
-    return {"items": [model_to_dict(o) for o in rows], "total": total}
+    items = [model_to_dict(o) for o in rows]
+    if total == 0:
+        cache_kind = CACHE_KIND_MAP.get(model)
+        if cache_kind:
+            cached = local_cache.read_events(user, cache_kind, start_time=start_time, end_time=end_time)
+            total = len(cached)
+            items = cached[offset : offset + limit]
+    return {"items": items, "total": total}

@@ -5,6 +5,7 @@ from app.models.orders import OrderHistory
 from app.models.portfolio import PortfolioSeries, PortfolioSnapshot
 from app.models.scores import WalletMetric, WalletScore
 from app.models.wallets import Wallet
+from app.models.wallet_follow import WalletFollow
 from app.models.auth import User, Role, Permission, AuditLog, SystemConfig, UserPreference
 from app.models.tags import Tag, WalletTag
 from app.models.leaderboard import Leaderboard, LeaderboardResult
@@ -31,6 +32,7 @@ __all__ = [
     "WalletMetric",
     "WalletScore",
     "Wallet",
+    "WalletFollow",
     "User",
     "Role",
     "Permission",

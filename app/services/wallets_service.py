@@ -19,7 +19,9 @@ from app.models import (
     WalletTag,
     Tag,
     PortfolioSnapshot,
+    WalletFollow,
 )
+from app.services import ai as ai_service
 
 LEDGER_INFLOW_TYPES = {"deposit", "vaultDeposit", "vaultDistribution"}
 LEDGER_OUTFLOW_TYPES = {"withdraw", "vaultWithdraw"}
@@ -111,9 +113,11 @@ def list_wallets(
     period: Optional[str] = None,
     sort_key: Optional[str] = None,
     sort_order: str = "desc",
+    followed_only: bool = False,
 ):
     limit = min(max(limit, 1), 100)
     offset = max(offset, 0)
+    ai_available = ai_service.get_ai_config().is_enabled
     normalized_period = None
     if period and (period == "all" or period in PERIOD_PRESETS):
         normalized_period = period
@@ -251,7 +255,14 @@ def list_wallets(
         ]
 
         data_query = (
-            select(Wallet, *metric_columns, *portfolio_columns, *ai_columns)
+            select(
+                Wallet,
+                *metric_columns,
+                *portfolio_columns,
+                *ai_columns,
+                WalletFollow.wallet_address.label("follow_wallet"),
+                WalletFollow.note.label("follow_note"),
+            )
             .outerjoin(metric_view, Wallet.address == metric_view.c.metric_user)
             .outerjoin(portfolio_week, Wallet.address == portfolio_week.c.portfolio_week_user)
             .outerjoin(portfolio_month, Wallet.address == portfolio_month.c.portfolio_month_user)
@@ -263,6 +274,12 @@ def list_wallets(
             predicate = and_(*conditions)
             count_query = count_query.where(predicate)
             data_query = data_query.where(predicate)
+
+        if followed_only:
+            count_query = count_query.join(WalletFollow, Wallet.address == WalletFollow.wallet_address)
+            data_query = data_query.join(WalletFollow, Wallet.address == WalletFollow.wallet_address)
+        else:
+            data_query = data_query.outerjoin(WalletFollow, Wallet.address == WalletFollow.wallet_address)
 
         sort_column = sort_key_map.get(sort_key or "")
         if sort_column is not None:
@@ -337,6 +354,8 @@ def list_wallets(
             "active_days": active_days,
             "metric": metric_dict,
             "metric_period": normalized_period if metric_dict else None,
+            "is_followed": bool(metric_row.get("follow_wallet")),
+            "ai_enabled": ai_available,
         }
         portfolio_stats = portfolio_map.get(wallet.address)
         if portfolio_stats:
@@ -388,6 +407,12 @@ def get_wallet_detail(address: str) -> Optional[dict]:
         tags_map = _tags_map(session, [address])
         portfolio_stats = _portfolio_map(session, [address]).get(address)
         ledger_summary = _ledger_summary(session, address)
+        is_followed = (
+            session.execute(
+                select(func.count()).select_from(WalletFollow).where(WalletFollow.wallet_address == address)
+            ).scalar_one()
+            > 0
+        )
     raw_tags = tags_map.get(address) or (json.loads(wallet.tags) if wallet.tags else [])
     normalized_tags = []
     for tag in raw_tags:
@@ -440,6 +465,8 @@ def get_wallet_detail(address: str) -> Optional[dict]:
         data["ai_analysis"] = ai_dict
     if ledger_summary:
         data["ledger_summary"] = ledger_summary
+    data["is_followed"] = is_followed
+    data["ai_enabled"] = ai_service.get_ai_config().is_enabled
     return data
 
 
@@ -497,6 +524,38 @@ def get_wallet_overview() -> dict:
         "fills": fills,
         "last_sync": last_sync.isoformat() if last_sync else None,
     }
+
+
+def set_wallet_follow(address: str, follow: bool, note: Optional[str] = None) -> Optional[dict]:
+    with session_scope() as session:
+        wallet = session.execute(select(Wallet).where(Wallet.address == address)).scalar_one_or_none()
+        if not wallet:
+            return None
+        existing = (
+            session.execute(select(WalletFollow).where(WalletFollow.wallet_address == address))
+            .scalars()
+            .first()
+        )
+        if follow:
+            if existing:
+                existing.note = note
+                session.add(existing)
+            else:
+                session.add(WalletFollow(wallet_address=address, note=note))
+        else:
+            if existing:
+                session.delete(existing)
+        session.flush()
+        latest = (
+            session.execute(select(WalletFollow).where(WalletFollow.wallet_address == address))
+            .scalars()
+            .first()
+        )
+        return {"address": address, "is_followed": bool(latest), "note": latest.note if latest else None}
+
+
+def list_followed_wallets(limit: int = 20, offset: int = 0):
+    return list_wallets(limit=limit, offset=offset, followed_only=True)
 
 
 def list_import_records(limit: int = 20, offset: int = 0):

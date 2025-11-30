@@ -18,6 +18,8 @@ from app.schemas.wallets import (
     WalletImportHistoryResponse,
     WalletNoteRequest,
     WalletNoteResponse,
+    WalletFollowRequest,
+    WalletFollowResponse,
 )
 from app.services.wallet_importer import import_wallets
 from app.services import query as query_service
@@ -119,6 +121,14 @@ def wallets_list(
     )
 
 
+@router.get("/wallets/following", response_model=WalletListResponse, summary="关注的钱包列表")
+def wallets_following(
+    limit: int = Query(20, ge=1, le=100),
+    offset: int = Query(0, ge=0),
+):
+    return wallets_service.list_followed_wallets(limit=limit, offset=offset)
+
+
 @router.get("/wallets/overview", summary="钱包概览统计")
 def wallet_overview():
     return wallets_service.get_wallet_overview()
@@ -138,6 +148,32 @@ def wallet_update_note(address: str, payload: WalletNoteRequest) -> WalletNoteRe
     if note is None and payload.note is not None:
         raise HTTPException(status_code=404, detail="wallet not found")
     return WalletNoteResponse(address=address, note=note)
+
+
+@router.post(
+    "/wallets/{address}/follow",
+    response_model=WalletFollowResponse,
+    dependencies=[Depends(get_current_user)],
+    summary="关注钱包",
+)
+def wallet_follow(address: str, payload: WalletFollowRequest | None = Body(None)) -> WalletFollowResponse:
+    result = wallets_service.set_wallet_follow(address, True, note=payload.note if payload else None)
+    if result is None:
+        raise HTTPException(status_code=404, detail="wallet not found")
+    return WalletFollowResponse(**result)
+
+
+@router.delete(
+    "/wallets/{address}/follow",
+    response_model=WalletFollowResponse,
+    dependencies=[Depends(get_current_user)],
+    summary="取消关注钱包",
+)
+def wallet_unfollow(address: str) -> WalletFollowResponse:
+    result = wallets_service.set_wallet_follow(address, False)
+    if result is None:
+        raise HTTPException(status_code=404, detail="wallet not found")
+    return WalletFollowResponse(**result)
 
 
 @router.get("/wallets/{address}/ai", response_model=AIAnalysisResponse, summary="获取钱包 AI 分析")

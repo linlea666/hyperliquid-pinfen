@@ -147,6 +147,8 @@ class WalletSummary(BaseModel):
     metric_period: Optional[str] = None
     portfolio: Optional[dict] = None
     ai_analysis: Optional[dict] = None
+    is_followed: bool = False
+    ai_enabled: Optional[bool] = None
 
 
 class WalletListResponse(BaseModel):
@@ -165,4 +167,14 @@ class WalletNoteRequest(BaseModel):
 
 class WalletNoteResponse(BaseModel):
     address: str
+    note: Optional[str] = None
+
+
+class WalletFollowRequest(BaseModel):
+    note: Optional[str] = None
+
+
+class WalletFollowResponse(BaseModel):
+    address: str
+    is_followed: bool
     note: Optional[str] = None

@@ -83,8 +83,8 @@ export default function LeaderboardDetail() {
   };
 
   const sortedResults = useMemo(() => {
-    if (!data) return [];
-    const clone = [...data.results];
+    const rows = data?.results ?? [];
+    const clone = [...rows];
     switch (sortKey) {
       case 'win_rate':
         clone.sort((a, b) => (Number(b.metrics?.win_rate ?? 0) - Number(a.metrics?.win_rate ?? 0)));

@@ -1,4 +1,4 @@
-from app.models.ledger import LedgerEvent, FetchCursor
+from app.models.ledger import LedgerEvent, FundingEvent, FetchCursor
 from app.models.fills import Fill
 from app.models.positions import PositionSnapshot
 from app.models.orders import OrderHistory
@@ -23,6 +23,7 @@ from app.models.wallet_import import WalletImportRecord
 
 __all__ = [
     "LedgerEvent",
+    "FundingEvent",
     "FetchCursor",
     "Fill",
     "PositionSnapshot",

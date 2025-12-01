@@ -14,12 +14,7 @@ import AdminPanel from './pages/Admin';
 import Login from './pages/Login';
 import WalletImport from './pages/WalletImport';
 
-function ProtectedLayout() {
-  const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
-  if (!token) {
-    return <Navigate to="/login" replace />;
-  }
-
+function AppLayout() {
   return (
     <div className="app-shell">
       <Sidebar />
@@ -31,6 +26,19 @@ function ProtectedLayout() {
       </div>
     </div>
   );
+}
+
+function ProtectedLayout() {
+  const token = typeof window !== 'undefined' ? localStorage.getItem('authToken') : null;
+  if (!token) {
+    return <Navigate to="/login" replace />;
+  }
+
+  return <AppLayout />;
+}
+
+function PublicLayout() {
+  return <AppLayout />;
 }
 
 function App() {
@@ -46,12 +54,15 @@ function App() {
           <Route path="/wallets/:address" element={<WalletDetail />} />
           <Route path="/wallets/import" element={<WalletImport />} />
           <Route path="/leaderboards" element={<Leaderboards />} />
-          <Route path="/leaderboards/:id" element={<LeaderboardDetail />} />
           <Route path="/operations" element={<Operations />} />
           <Route path="/settings" element={<Settings />} />
           <Route path="/admin" element={<AdminPanel />} />
           <Route path="*" element={<Navigate to="/dashboard" replace />} />
         </Route>
+        <Route element={<PublicLayout />}>
+          <Route path="/leaderboards/:id" element={<LeaderboardDetail />} />
+        </Route>
+        <Route path="*" element={<Navigate to="/dashboard" replace />} />
       </Routes>
       <div id="toast-root" className="toast-container" />
     </>

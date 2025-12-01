@@ -11,6 +11,7 @@ from app.core.database import session_scope
 from app.models import (
     FetchCursor,
     Fill,
+    FundingEvent,
     LedgerEvent,
     PositionSnapshot,
     OrderHistory,
@@ -20,7 +21,6 @@ from app.models import (
 )
 from app.services.hyperliquid_client import HyperliquidClient
 from app.services import local_cache, processing_config
-from app.services import local_cache
 
 logger = logging.getLogger(__name__)
 
@@ -50,11 +50,17 @@ def _dec(value: Optional[str]):
     return Decimal(value) if value is not None else None
 
 
+def _first_defined(*values: Optional[str]):
+    for val in values:
+        if val is not None:
+            return val
+    return None
+
+
 def sync_ledger(user: str, end_time: Optional[int] = None) -> int:
     """Fetch and store ledger updates; returns number of new rows."""
-    with session_scope() as session, HyperliquidClient() as client:
+    with session_scope(use_lock=True) as session, HyperliquidClient() as client:
         start_time = _get_cursor(session, user, "ledger") + 1
-        initial_only = start_time <= 1
         new_rows = 0
         last_time_written: Optional[int] = None
         while True:
@@ -71,8 +77,8 @@ def sync_ledger(user: str, end_time: Optional[int] = None) -> int:
                     delta_type=delta.get("type", ""),
                     vault=delta.get("vault"),
                     token=delta.get("token"),
-                    amount=_dec(delta.get("amount") or delta.get("usdc")),
-                    usdc_value=_dec(delta.get("usdcValue") or delta.get("usdc")),
+                    amount=_dec(_first_defined(delta.get("amount"), delta.get("usdc"))),
+                    usdc_value=_dec(_first_defined(delta.get("usdcValue"), delta.get("usdc"))),
                     fee=_dec(delta.get("fee")),
                     native_token_fee=_dec(delta.get("nativeTokenFee")),
                     nonce=delta.get("nonce"),
@@ -92,8 +98,6 @@ def sync_ledger(user: str, end_time: Optional[int] = None) -> int:
                 last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
             if len(batch) < 500:  # reached end
                 break
-            if initial_only:
-                break
         if new_rows:
             cursor_value = last_time_written if last_time_written is not None else (start_time - 1)
             _upsert_cursor(session, user, "ledger", cursor_value)
@@ -103,9 +107,8 @@ def sync_ledger(user: str, end_time: Optional[int] = None) -> int:
 
 def sync_fills(user: str, end_time: Optional[int] = None) -> int:
     """Fetch fills with time pagination; returns number of new rows."""
-    with session_scope() as session, HyperliquidClient() as client:
+    with session_scope(use_lock=True) as session, HyperliquidClient() as client:
         start_time = _get_cursor(session, user, "fills") + 1
-        initial_only = start_time <= 1
         new_rows = 0
         last_time_written: Optional[int] = None
         earliest_time: Optional[int] = None
@@ -143,8 +146,6 @@ def sync_fills(user: str, end_time: Optional[int] = None) -> int:
                 earliest_time = event_time if earliest_time is None else min(earliest_time, event_time)
             if len(batch) < 2000:
                 break
-            if initial_only:
-                break
         if new_rows:
             cursor_value = last_time_written if last_time_written is not None else (start_time - 1)
             _upsert_cursor(session, user, "fills", cursor_value)
@@ -159,9 +160,8 @@ def sync_fills(user: str, end_time: Optional[int] = None) -> int:
 
 
 def sync_funding(user: str, end_time: Optional[int] = None) -> int:
-    with session_scope() as session, HyperliquidClient() as client:
+    with session_scope(use_lock=True) as session, HyperliquidClient() as client:
         start_time = _get_cursor(session, user, "funding") + 1
-        initial_only = start_time <= 1
         new_rows = 0
         last_time_written: Optional[int] = None
         while True:
@@ -170,13 +170,34 @@ def sync_funding(user: str, end_time: Optional[int] = None) -> int:
                 break
             local_cache.append_events(user, "funding", batch)
             for item in batch:
+                delta = item.get("delta", {})
+                stmt = sqlite_insert(FundingEvent).values(
+                    user=user,
+                    time_ms=item["time"],
+                    hash=item.get("hash", ""),
+                    delta_type=delta.get("type", ""),
+                    vault=delta.get("vault"),
+                    token=delta.get("token"),
+                    amount=_dec(_first_defined(delta.get("amount"), delta.get("usdc"))),
+                    usdc_value=_dec(_first_defined(delta.get("usdcValue"), delta.get("usdc"))),
+                    fee=_dec(delta.get("fee")),
+                    native_token_fee=_dec(delta.get("nativeTokenFee")),
+                    nonce=delta.get("nonce"),
+                    basis=_dec(delta.get("basis")),
+                    commission=_dec(delta.get("commission")),
+                    closing_cost=_dec(delta.get("closingCost")),
+                    net_withdrawn_usd=_dec(delta.get("netWithdrawnUsd")),
+                    source_dex=delta.get("sourceDex"),
+                    destination_dex=delta.get("destinationDex"),
+                    raw_json=json.dumps(item),
+                ).prefix_with("OR IGNORE")
+                result = session.execute(stmt)
+                if result.rowcount:
+                    new_rows += 1
                 event_time = item["time"]
                 start_time = max(start_time, event_time + 1)
                 last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
-                new_rows += 1
             if len(batch) < 2000:
-                break
-            if initial_only:
                 break
         if new_rows:
             cursor_value = last_time_written if last_time_written is not None else (start_time - 1)
@@ -194,7 +215,7 @@ def sync_user_fees(user: str) -> None:
 
 def sync_positions(user: str) -> int:
     """Fetch current positions snapshot; returns number of rows written."""
-    with session_scope() as session, HyperliquidClient() as client:
+    with session_scope(use_lock=True) as session, HyperliquidClient() as client:
         snapshot = client.portfolio(user)
         if not snapshot or not isinstance(snapshot, dict):
             return 0
@@ -239,7 +260,7 @@ def sync_positions(user: str) -> int:
 
 def sync_orders(user: str) -> int:
     """Fetch historical orders (most recent 2000) and store; not paginated by API limit."""
-    with session_scope() as session, HyperliquidClient() as client:
+    with session_scope(use_lock=True) as session, HyperliquidClient() as client:
         start_time = _get_cursor(session, user, "orders") + 1
         batch = client.historical_orders(user=user)
         new_rows = 0
@@ -289,7 +310,7 @@ def _should_refresh_portfolio(session, user: str) -> bool:
 
 def sync_portfolio_series(user: str, force: bool = False) -> int:
     """Fetch portfolio time series and store account value/pnl per interval."""
-    with session_scope() as session:
+    with session_scope(use_lock=True) as session:
         if not force and not _should_refresh_portfolio(session, user):
             return 0
         with HyperliquidClient() as client:

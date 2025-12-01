@@ -31,8 +31,8 @@ class HyperliquidClient:
         return self._post(body)
 
     def user_fills(self, user: str, start_time: int, end_time: Optional[int] = None) -> List[Dict[str, Any]]:
-        """Uses userFillsByTime when start_time specified; otherwise defaults to recent fills."""
-        if start_time or end_time:
+        """Uses userFillsByTime when start_time is provided (even 0) to避免历史缺口。"""
+        if start_time is not None or end_time is not None:
             body: Dict[str, Any] = {
                 "type": "userFillsByTime",
                 "user": user,

@@ -99,7 +99,16 @@ def run_wallet_score(address: str, log_id: int | None = None, scheduled_by: str 
     processing.mark_stage_running(log_id)
     task_id = tasks_service.log_task_start("wallet_score", {"address": address, "scheduled_by": scheduled_by})
     try:
-        metric, score = scoring.compute_metrics(address)
+        try:
+            metric, score = scoring.compute_metrics(address)
+        except ValueError as exc:
+            # 当无成交或样本不足时，跳过评分，避免任务失败阻断后续流程
+            if "insufficient_data" in str(exc):
+                result = {"skipped": True, "reason": "insufficient_data"}
+                processing.mark_stage_success(log_id, result)
+                tasks_service.log_task_end(task_id, "completed", result=result)
+                return result
+            raise
         result = {"metric_id": metric.id, "score_id": score.id}
         processing.mark_stage_success(log_id, result)
         tasks_service.log_task_end(task_id, "completed", result=result)

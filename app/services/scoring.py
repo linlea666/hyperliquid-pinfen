@@ -87,6 +87,10 @@ def compute_metrics(user: str) -> Tuple[WalletMetric, WalletScore]:
         import time
         now_ms = int(time.time() * 1000)
 
+        # 无成交时直接跳过写入，避免空钱包占榜单
+        if trades == 0:
+            raise ValueError("insufficient_data")
+
         period_windows = {
             "1d": 86_400_000,
             "7d": 7 * 86_400_000,
@@ -164,15 +168,12 @@ def compute_metrics(user: str) -> Tuple[WalletMetric, WalletScore]:
             pnl_value = stats["pnl"]
             vol_value = stats["volume"]
             pnl_float = float(pnl_value)
-            if vol_value:
-                ratio = float(pnl_value / vol_value) * 100
-            else:
-                ratio = pnl_float * 100
+            ratio = None if vol_value == 0 else float(pnl_value / vol_value)
             period_results[key] = {
                 "pnl": pnl_float,
                 "return": ratio,
                 "trades": stats["trades"],
-        }
+            }
         details["periods"] = period_results
 
         funding_paid, funding_received = _funding_stats(user)

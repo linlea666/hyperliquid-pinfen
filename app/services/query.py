@@ -157,6 +157,7 @@ def paged_events(model, user: str, start_time: int = None, end_time: int = None,
         return data
 
     items = [model_to_dict(o) for o in rows]
+    # DB 为空时回退本地缓存（同步失败或尚未入库时也能返回历史）
     if total == 0:
         cache_kind = CACHE_KIND_MAP.get(model)
         if cache_kind:

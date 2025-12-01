@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from decimal import Decimal
 from typing import Any, Dict, List, Optional
 
-from sqlalchemy import and_, asc, desc, func, select, case
+from sqlalchemy import and_, asc, desc, func, select, case, exists
 from sqlalchemy.orm import aliased
 
 from app.core.database import session_scope
@@ -132,11 +132,12 @@ def list_wallets(
         conditions.append(Wallet.tags.like(f'%"{tag}"%'))
 
     with session_scope() as session:
-        follow_count_alias = aliased(WalletFollow)
         follow_alias = aliased(WalletFollow)
         count_query = select(func.count()).select_from(Wallet)
         if followed_only:
-            count_query = count_query.join(follow_count_alias, Wallet.address == follow_count_alias.wallet_address)
+            count_query = count_query.where(
+                exists().where(follow_alias.wallet_address == Wallet.address)
+            )
         period_cutoff = _period_cutoff_ms(normalized_period)
         metric_latest = (
             select(

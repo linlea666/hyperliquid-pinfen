@@ -55,46 +55,40 @@ def sync_ledger(user: str, end_time: Optional[int] = None) -> int:
     """Fetch and store ledger updates; returns number of new rows."""
     with session_scope(use_lock=True) as session, HyperliquidClient() as client:
         start_time = _get_cursor(session, user, "ledger") + 1
-        initial_only = start_time <= 1
+        batch = client.user_non_funding_ledger_updates(user=user, start_time=start_time, end_time=end_time)
+        if not batch:
+            return 0
         new_rows = 0
         last_time_written: Optional[int] = None
-        while True:
-            batch = client.user_non_funding_ledger_updates(user=user, start_time=start_time, end_time=end_time)
-            if not batch:
-                break
-            local_cache.append_events(user, "ledger", batch)
-            for item in batch:
-                delta = item.get("delta", {})
-                stmt = sqlite_insert(LedgerEvent).values(
-                    user=user,
-                    time_ms=item["time"],
-                    hash=item.get("hash", ""),
-                    delta_type=delta.get("type", ""),
-                    vault=delta.get("vault"),
-                    token=delta.get("token"),
-                    amount=_dec(delta.get("amount") or delta.get("usdc")),
-                    usdc_value=_dec(delta.get("usdcValue") or delta.get("usdc")),
-                    fee=_dec(delta.get("fee")),
-                    native_token_fee=_dec(delta.get("nativeTokenFee")),
-                    nonce=delta.get("nonce"),
-                    basis=_dec(delta.get("basis")),
-                    commission=_dec(delta.get("commission")),
-                    closing_cost=_dec(delta.get("closingCost")),
-                    net_withdrawn_usd=_dec(delta.get("netWithdrawnUsd")),
-                    source_dex=delta.get("sourceDex"),
-                    destination_dex=delta.get("destinationDex"),
-                    raw_json=json.dumps(item),
-                ).prefix_with("OR IGNORE")
-                result = session.execute(stmt)
-                if result.rowcount:
-                    new_rows += 1
-                event_time = item["time"]
-                start_time = max(start_time, event_time + 1)
-                last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
-            if len(batch) < 500:  # reached end
-                break
-            if initial_only:
-                break
+        local_cache.append_events(user, "ledger", batch)
+        for item in batch:
+            delta = item.get("delta", {})
+            stmt = sqlite_insert(LedgerEvent).values(
+                user=user,
+                time_ms=item["time"],
+                hash=item.get("hash", ""),
+                delta_type=delta.get("type", ""),
+                vault=delta.get("vault"),
+                token=delta.get("token"),
+                amount=_dec(delta.get("amount") or delta.get("usdc")),
+                usdc_value=_dec(delta.get("usdcValue") or delta.get("usdc")),
+                fee=_dec(delta.get("fee")),
+                native_token_fee=_dec(delta.get("nativeTokenFee")),
+                nonce=delta.get("nonce"),
+                basis=_dec(delta.get("basis")),
+                commission=_dec(delta.get("commission")),
+                closing_cost=_dec(delta.get("closingCost")),
+                net_withdrawn_usd=_dec(delta.get("netWithdrawnUsd")),
+                source_dex=delta.get("sourceDex"),
+                destination_dex=delta.get("destinationDex"),
+                raw_json=json.dumps(item),
+            ).prefix_with("OR IGNORE")
+            result = session.execute(stmt)
+            if result.rowcount:
+                new_rows += 1
+            event_time = item["time"]
+            start_time = max(start_time, event_time + 1)
+            last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
         if new_rows:
             cursor_value = last_time_written if last_time_written is not None else (start_time - 1)
             _upsert_cursor(session, user, "ledger", cursor_value)
@@ -106,43 +100,40 @@ def sync_fills(user: str, end_time: Optional[int] = None) -> int:
     """Fetch fills with time pagination; returns number of new rows."""
     with session_scope(use_lock=True) as session, HyperliquidClient() as client:
         start_time = _get_cursor(session, user, "fills") + 1
+        batch = client.user_fills(user=user, start_time=start_time, end_time=end_time)
+        if not batch:
+            return 0
         new_rows = 0
         last_time_written: Optional[int] = None
         earliest_time: Optional[int] = None
-        while True:
-            batch = client.user_fills(user=user, start_time=start_time, end_time=end_time)
-            if not batch:
-                break
-            local_cache.append_events(user, "fills", batch)
-            for item in batch:
-                stmt = sqlite_insert(Fill).values(
-                    user=user,
-                    time_ms=item["time"],
-                    coin=item["coin"],
-                    side=item.get("side"),
-                    dir=item.get("dir"),
-                    px=_dec(item.get("px")),
-                    sz=_dec(item.get("sz")),
-                    fee=_dec(item.get("fee")),
-                    fee_token=item.get("feeToken"),
-                    crossed=item.get("crossed"),
-                    closed_pnl=_dec(item.get("closedPnl")),
-                    start_position=_dec(item.get("startPosition")),
-                    hash=item.get("hash"),
-                    oid=item.get("oid"),
-                    tid=item.get("tid"),
-                    builder_fee=_dec(item.get("builderFee")),
-                    raw_json=json.dumps(item),
-                ).prefix_with("OR IGNORE")
-                result = session.execute(stmt)
-                if result.rowcount:
-                    new_rows += 1
-                event_time = item["time"]
-                start_time = max(start_time, event_time + 1)
-                last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
-                earliest_time = event_time if earliest_time is None else min(earliest_time, event_time)
-            if len(batch) < 2000:
-                break
+        local_cache.append_events(user, "fills", batch)
+        for item in batch:
+            stmt = sqlite_insert(Fill).values(
+                user=user,
+                time_ms=item["time"],
+                coin=item["coin"],
+                side=item.get("side"),
+                dir=item.get("dir"),
+                px=_dec(item.get("px")),
+                sz=_dec(item.get("sz")),
+                fee=_dec(item.get("fee")),
+                fee_token=item.get("feeToken"),
+                crossed=item.get("crossed"),
+                closed_pnl=_dec(item.get("closedPnl")),
+                start_position=_dec(item.get("startPosition")),
+                hash=item.get("hash"),
+                oid=item.get("oid"),
+                tid=item.get("tid"),
+                builder_fee=_dec(item.get("builderFee")),
+                raw_json=json.dumps(item),
+            ).prefix_with("OR IGNORE")
+            result = session.execute(stmt)
+            if result.rowcount:
+                new_rows += 1
+            event_time = item["time"]
+            start_time = max(start_time, event_time + 1)
+            last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
+            earliest_time = event_time if earliest_time is None else min(earliest_time, event_time)
         if new_rows:
             cursor_value = last_time_written if last_time_written is not None else (start_time - 1)
             _upsert_cursor(session, user, "fills", cursor_value)
@@ -159,43 +150,40 @@ def sync_fills(user: str, end_time: Optional[int] = None) -> int:
 def sync_funding(user: str, end_time: Optional[int] = None) -> int:
     with session_scope(use_lock=True) as session, HyperliquidClient() as client:
         start_time = _get_cursor(session, user, "funding") + 1
+        batch = client.user_funding(user=user, start_time=start_time, end_time=end_time)
+        if not batch:
+            return 0
         new_rows = 0
         last_time_written: Optional[int] = None
-        while True:
-            batch = client.user_funding(user=user, start_time=start_time, end_time=end_time)
-            if not batch:
-                break
-            local_cache.append_events(user, "funding", batch)
-            for item in batch:
-                delta = item.get("delta", {})
-                stmt = sqlite_insert(FundingEvent).values(
-                    user=user,
-                    time_ms=item["time"],
-                    hash=item.get("hash", ""),
-                    delta_type=delta.get("type", ""),
-                    vault=delta.get("vault"),
-                    token=delta.get("token"),
-                    amount=_dec(delta.get("amount") or delta.get("usdc")),
-                    usdc_value=_dec(delta.get("usdcValue") or delta.get("usdc")),
-                    fee=_dec(delta.get("fee")),
-                    native_token_fee=_dec(delta.get("nativeTokenFee")),
-                    nonce=delta.get("nonce"),
-                    basis=_dec(delta.get("basis")),
-                    commission=_dec(delta.get("commission")),
-                    closing_cost=_dec(delta.get("closingCost")),
-                    net_withdrawn_usd=_dec(delta.get("netWithdrawnUsd")),
-                    source_dex=delta.get("sourceDex"),
-                    destination_dex=delta.get("destinationDex"),
-                    raw_json=json.dumps(item),
-                ).prefix_with("OR IGNORE")
-                result = session.execute(stmt)
-                if result.rowcount:
-                    new_rows += 1
-                event_time = item["time"]
-                start_time = max(start_time, event_time + 1)
-                last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
-            if len(batch) < 2000:
-                break
+        local_cache.append_events(user, "funding", batch)
+        for item in batch:
+            delta = item.get("delta", {})
+            stmt = sqlite_insert(FundingEvent).values(
+                user=user,
+                time_ms=item["time"],
+                hash=item.get("hash", ""),
+                delta_type=delta.get("type", ""),
+                vault=delta.get("vault"),
+                token=delta.get("token"),
+                amount=_dec(delta.get("amount") or delta.get("usdc")),
+                usdc_value=_dec(delta.get("usdcValue") or delta.get("usdc")),
+                fee=_dec(delta.get("fee")),
+                native_token_fee=_dec(delta.get("nativeTokenFee")),
+                nonce=delta.get("nonce"),
+                basis=_dec(delta.get("basis")),
+                commission=_dec(delta.get("commission")),
+                closing_cost=_dec(delta.get("closingCost")),
+                net_withdrawn_usd=_dec(delta.get("netWithdrawnUsd")),
+                source_dex=delta.get("sourceDex"),
+                destination_dex=delta.get("destinationDex"),
+                raw_json=json.dumps(item),
+            ).prefix_with("OR IGNORE")
+            result = session.execute(stmt)
+            if result.rowcount:
+                new_rows += 1
+            event_time = item["time"]
+            start_time = max(start_time, event_time + 1)
+            last_time_written = event_time if last_time_written is None else max(last_time_written, event_time)
         if new_rows:
             cursor_value = last_time_written if last_time_written is not None else (start_time - 1)
             _upsert_cursor(session, user, "funding", cursor_value)

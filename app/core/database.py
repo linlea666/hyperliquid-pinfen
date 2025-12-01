@@ -1,4 +1,4 @@
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from typing import Generator
 
 from sqlalchemy import create_engine, text
@@ -34,14 +34,22 @@ SessionLocal = sessionmaker(
 
 
 @contextmanager
-def session_scope() -> Generator[Session, None, None]:
-    """Provide a transactional scope around a series of operations."""
-    session = SessionLocal()
-    try:
-        yield session
-        session.commit()
-    except Exception:
-        session.rollback()
-        raise
-    finally:
-        session.close()
+def session_scope(*, use_lock: bool = False) -> Generator[Session, None, None]:
+    """Provide a transactional scope around a series of operations.
+
+    The optional ``use_lock`` flag serializes access for SQLite write-heavy
+    workflows to avoid ``database is locked`` errors when multiple workers
+    compete for the same connection.
+    """
+
+    lock_ctx = write_lock if use_lock else nullcontext()
+    with lock_ctx:
+        session = SessionLocal()
+        try:
+            yield session
+            session.commit()
+        except Exception:
+            session.rollback()
+            raise
+        finally:
+            session.close()

@@ -115,7 +115,7 @@ def list_processing_logs(
 def processing_summary():
     data = processing_service.summary()
     queue = task_queue.get_queue()
-    queue_size = queue.count
+    queue_size = queue.count()
 
     def map_log(log):
         return ProcessingLogResponse(

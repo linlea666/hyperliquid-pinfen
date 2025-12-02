@@ -264,8 +264,10 @@ def summary(failed_limit: int = 5) -> dict:
         )
     sync_counts = next((item["counts"] for item in stage_stats if item["stage"] == "sync"), {})
     pending_wallets = (sync_counts.get("pending", 0) or 0) + (sync_counts.get("running", 0) or 0)
-    batches = math.ceil(pending_wallets / cfg["batch_size"]) if pending_wallets else 0
-    estimate_seconds = batches * cfg["batch_interval_seconds"]
+    batch_size = cfg.get("batch_size", 20)
+    interval_seconds = cfg.get("batch_interval_seconds", 600)
+    batches = math.ceil(pending_wallets / batch_size) if pending_wallets else 0
+    estimate_seconds = batches * interval_seconds
     desc_text, scope_payload = _scope_description(cfg)
     return {
         "stages": stage_stats,
@@ -278,12 +280,44 @@ def summary(failed_limit: int = 5) -> dict:
     }
 
 
+def enqueue_pending_wallets(force: bool = False) -> dict:
+    """Periodic enqueue: 按配置批量把未处理钱包加入队列，支持多批循环。"""
+    cfg = processing_config.get_processing_config()
+    scope_type = cfg.get("scope_type", "all")
+    recent_days = cfg.get("scope_recent_days", 7)
+    tag = cfg.get("scope_tag")
+    batch_size = cfg.get("batch_size", 50)
+    max_batches = cfg.get("max_batches_per_cycle", 3)
+
+    total_enqueued = 0
+    batches_run = 0
+    while batches_run < max_batches:
+        addresses = select_wallets_for_scope(scope_type, recent_days, tag, batch_size, force=force)
+        if not addresses:
+            break
+        for addr in addresses:
+            try:
+                # 只安排 sync，后续 pipeline 自动触发 score/ai
+                from app.services import task_queue
+
+                task_queue.enqueue_wallet_sync(addr, scheduled_by="scheduler", force=force)
+                total_enqueued += 1
+            except Exception:
+                logger.debug("enqueue wallet failed", exc_info=True)
+                continue
+        batches_run += 1
+        if len(addresses) < batch_size:
+            break
+    return {"enqueued": total_enqueued, "batches": batches_run}
+
+
 def select_wallets_for_scope(
     scope_type: str,
     recent_days: int,
     tag: Optional[str],
     batch_size: int,
     force: bool = False,
+    offset: int = 0,
 ) -> list[str]:
     now = datetime.utcnow()
 
@@ -331,6 +365,9 @@ def select_wallets_for_scope(
             if not tag:
                 return []
             stmt = stmt.where(Wallet.tags.like(f'%"{tag}"%'))
-        stmt = stmt.order_by(desc(priority_expr), asc(Wallet.next_score_due), asc(Wallet.created_at)).limit(batch_size)
+        stmt = stmt.order_by(desc(priority_expr), asc(Wallet.next_score_due), asc(Wallet.created_at))
+        if offset:
+            stmt = stmt.offset(offset)
+        stmt = stmt.limit(batch_size)
         rows = session.execute(stmt).all()
         return [row[0] for row in rows]

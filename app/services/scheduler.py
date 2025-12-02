@@ -9,6 +9,7 @@ from apscheduler.triggers.interval import IntervalTrigger
 from app.core.database import session_scope
 from app.models import ScheduleJob
 from app.services import leaderboard as leaderboard_service
+from app.services import processing_config, processing
 from app.services import task_queue
 
 logger = logging.getLogger(__name__)
@@ -38,6 +39,18 @@ def refresh_jobs() -> None:
     if _scheduler is None:
         return
     _scheduler.remove_all_jobs()
+    # 周期性批量处理任务
+    cfg = processing_config.get_processing_config()
+    interval_seconds = cfg.get("batch_interval_seconds", 600)
+    try:
+        _scheduler.add_job(
+            processing.enqueue_pending_wallets,
+            trigger=IntervalTrigger(seconds=interval_seconds),
+            id="processing-batch",
+            replace_existing=True,
+        )
+    except Exception as exc:
+        logger.error("Failed to schedule processing batch job: %s", exc)
     with session_scope() as session:
         jobs = session.query(ScheduleJob).filter(ScheduleJob.enabled == 1).all()
     for job in jobs:

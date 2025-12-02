@@ -840,6 +840,15 @@ export default function AdminPanel() {
                   <span className="muted">定时任务两批之间的等待时间</span>
                 </label>
                 <label>
+                  最大批次数/周期
+                  <input
+                    type="number"
+                    value={processingDraft.max_batches_per_cycle}
+                    onChange={(e) => updateProcessingDraft((draft) => (draft.max_batches_per_cycle = Number(e.target.value)))}
+                  />
+                  <span className="muted">每次调度最多连续跑多少批，防止无限循环</span>
+                </label>
+                <label>
                   API 速率 (次/分钟)
                   <input
                     type="number"

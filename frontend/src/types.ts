@@ -387,6 +387,7 @@ export interface ProcessingConfig {
   max_parallel_score: number;
   retry_limit: number;
   retry_delay_seconds: number;
+  max_batches_per_cycle: number;
   rescore_period_days: number;
   rescore_trigger_pct: number;
   ai_period_days: number;
